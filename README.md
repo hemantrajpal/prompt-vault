@@ -8,7 +8,7 @@
 
 ---
 
-![Prompt Vault — Intro Banner](prompt-vault-banner.png)
+![Prompt Vault — Intro Banner](prompt-vault-header.png)
 
 ---
 
