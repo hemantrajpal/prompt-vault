@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prompt Vault</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            heading: ['Space Grotesk', 'sans-serif'],
+          },
+          colors: {
+            background: 'var(--background)',
+            foreground: 'var(--foreground)',
+            card: 'var(--card)',
+            'card-foreground': 'var(--card-foreground)',
+            primary: 'var(--primary)',
+            'primary-foreground': 'var(--primary-foreground)',
+            secondary: 'var(--secondary)',
+            'secondary-foreground': 'var(--secondary-foreground)',
+            muted: 'var(--muted)',
+            'muted-foreground': 'var(--muted-foreground)',
+            border: 'var(--border)',
+            input: 'var(--input)',
+            destructive: 'var(--destructive)',
+            'destructive-foreground': 'var(--destructive-foreground)',
+          },
+          animation: {
+            'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'gradient-xy': 'gradientXY 4s ease infinite',
+            'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          },
+          keyframes: {
+            slideUp: {
+              '0%': { opacity: '0', transform: 'translateY(16px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+            gradientXY: {
+              '0%, 100%': { 'background-size': '400% 400%', 'background-position': 'left center' },
+              '50%': { 'background-size': '200% 200%', 'background-position': 'right center' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer base {
+      :root {
+        --background: #ffffff;
+        --foreground: #09090b;
+        --card: #ffffff;
+        --card-foreground: #09090b;
+        --primary: #f59e0b;
+        --primary-foreground: #09090b;
+        --secondary: #f4f4f5;
+        --secondary-foreground: #09090b;
+        --muted: #f4f4f5;
+        --muted-foreground: #71717a;
+        --border: #e4e4e7;
+        --input: #e4e4e7;
+        --destructive: #ef4444;
+        --destructive-foreground: #fafafa;
+      }
+      .dark {
+        --background: #09090b;
+        --foreground: #fafafa;
+        --card: #09090b;
+        --card-foreground: #fafafa;
+        --primary: #f59e0b;
+        --primary-foreground: #09090b;
+        --secondary: #27272a;
+        --secondary-foreground: #fafafa;
+        --muted: #18181b;
+        --muted-foreground: #a1a1aa;
+        --border: #27272a;
+        --input: #27272a;
+        --destructive: #ef4444;
+        --destructive-foreground: #fafafa;
+        --shadow: #fafafa;
+      }
+      body {
+        @apply bg-background text-foreground font-sans antialiased overflow-hidden selection:bg-primary/30;
+      }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { @apply bg-border rounded-full hover:bg-muted-foreground/50 transition-colors; }
+      .page { display: none; }
+      .page.active { display: flex; flex-direction: column; @apply animate-slide-up h-full overflow-y-auto; }
+      .input-base {
+        @apply flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200;
+      }
+      .btn {
+        @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+      }
+      .btn-primary { @apply bg-foreground text-background hover:bg-foreground/90 h-10 px-4 py-2 shadow-md; }
+      .btn-secondary { @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2; }
+      .btn-ghost { @apply hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2; }
+      .btn-destructive { @apply bg-destructive/10 text-destructive hover:bg-destructive/20 h-10 px-4 py-2; }
+      .btn-sm { @apply h-8 px-3 text-xs rounded-md; }
+      .magic-glow {
+        position: relative;
+        z-index: 0;
+      }
+      .magic-glow::before {
+        content: ""; position: absolute; z-index: -1; inset: -1.5px;
+        background: linear-gradient(90deg, #f59e0b, #ef4444, #8b5cf6, #3b82f6, #f59e0b);
+        background-size: 300% 300%;
+        animation: gradientXY 4s ease infinite;
+        border-radius: inherit;
+        opacity: 0.4;
+      }
+    }
+  </style>
+
+  <style>
+    /* ── Mobile Overlay ───────────────────────────────────── */
+    .mobile-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 40;
+      backdrop-filter: blur(2px);
+    }
+    .mobile-overlay.open { display: block; }
+
+    /* ── Mobile Sidebar ──────────────────────────────────── */
+    #mobile-menu-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: currentColor;
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    #mobile-menu-btn:hover { background: rgba(255,255,255,0.1); }
+
+    @media (max-width: 768px) {
+      #sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 50;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        height: 100vh;
+      }
+      #sidebar.open { transform: translateX(280px); }
+      #mobile-menu-btn { display: flex; }
+    }
+
+    @media (max-width: 480px) {
+      #search-input { width: 120px; }
+    }
+  </style>
+</head>
+<body class="flex h-screen w-screen bg-background">
+
+<!-- MOBILE OVERLAY -->
+<div class="mobile-overlay" id="mobile-overlay" onclick="toggleSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="w-64 border-r border-border bg-card flex flex-col shrink-0 h-full">
+  <div class="h-16 flex items-center justify-between px-5 border-b border-border shrink-0">
+    <div class="font-heading font-bold text-lg text-primary tracking-tight">Prompt Vault</div>
+    <div class="flex items-center gap-2">
+      <span class="text-[0.65rem] font-heading font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Preview</span>
+      <button onclick="toggleTheme()" class="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary">
+        <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+        <i data-lucide="sun" class="w-4 h-4 block dark:hidden"></i>
+      </button>
+    </div>
+  </div>
+  <div class="flex-1 overflow-y-auto w-full p-3 flex flex-col space-y-1">
+    
+    <div class="text-[0.65rem] font-bold text-muted-foreground/50 tracking-widen uppercase px-2 py-2 mt-1">Main</div>
+    
+    <button onclick="showPage('page-library', null, 'All Prompts')" id="nav-library" class="flex items-center gap-3 w-full px-2 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all nav-item active">
+      <i data-lucide="layout-grid" class="w-4 h-4 shrink-0"></i>
+      <span>All Prompts</span>
+    </button>
+    
+    <button onclick="showPage('page-editor',{isNew:true},'New Prompt')" class="flex items-center gap-3 w-full px-2 py-2 text-sm font-medium rounded-md text-foreground hover:bg-secondary/50 transition-all mt-1">
+      <i data-lucide="plus" class="w-4 h-4 shrink-0"></i>
+      <span>New Prompt</span>
+    </button>
+
+    <div class="flex items-center justify-between px-2 py-2 mt-4">
+      <div class="text-[0.65rem] font-bold text-muted-foreground/50 tracking-wider uppercase">Categories</div>
+      <button onclick="showPage('page-categories', null, 'Manage Categories')" class="text-[0.65rem] font-medium text-primary hover:underline transition-colors uppercase">Manage</button>
+    </div>
+    
+    <div id="sidebar-cats" class="w-full flex flex-col gap-0.5"></div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="flex-1 flex flex-col h-full bg-background overflow-hidden">
+  
+  <header class="h-16 border-b border-border flex items-center justify-between px-6 shrink-0 bg-background/80 backdrop-blur-md z-10">
+    <div class="flex items-center gap-2">
+      <button id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+      <h1 id="top-bar-title" class="font-heading font-bold text-lg tracking-tight truncate">All Prompts</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="relative group">
+        <i data-lucide="search" class="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors"></i>
+        <input type="text" id="search-input" oninput="renderLibrary()" placeholder="Search..." class="w-[200px] md:w-[280px] h-9 bg-secondary border border-border rounded-full pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all">
+      </div>
+      <button onclick="showPage('page-editor',{isNew:true},'New Prompt')" class="btn btn-primary btn-sm h-9 px-4 rounded-full shadow-sm hidden md:flex">
+        <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Prompt
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 overflow-hidden relative">
+    
+    <!-- LIBRARY PAGE -->
+    <div id="page-library" class="page active px-6 md:px-8 py-6">
+      <div id="filter-pills" class="flex flex-wrap gap-2 mb-8"></div>
+      <div id="library-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-20"></div>
+    </div>
+
+    <!-- DETAIL PAGE -->
+    <div id="page-detail" class="page px-6 md:px-10 py-6">
+      <div class="max-w-5xl w-full mx-auto pb-20">
+        <button onclick="showPage('page-library', null, 'All Prompts')" class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground font-medium mb-6 transition-colors w-fit">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Library
+        </button>
+
+        <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
+          <div>
+            <h2 id="detail-title" class="font-heading font-bold text-3xl md:text-4xl tracking-tight mb-2 text-foreground"></h2>
+            <div id="detail-meta" class="flex items-center gap-2 text-sm font-medium text-muted-foreground"></div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="showPage('page-editor', S.currentPrompt, 'Edit Prompt')" class="btn btn-secondary shadow-sm">
+              <i data-lucide="pencil" class="w-4 h-4"></i> Edit
+            </button>
+            <button onclick="deleteCurrentPrompt()" class="btn btn-destructive shadow-sm">
+              <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div class="lg:col-span-2 flex flex-col gap-6">
+            <div id="detail-image" class="w-full h-64 md:h-[340px] bg-cover bg-center rounded-xl border border-border shadow-sm" style="display:none"></div>
+            
+            <div class="bg-card border border-border rounded-xl p-6 shadow-sm">
+              <div class="flex items-center justify-between mb-4 border-b border-border pb-3">
+                <h3 class="font-heading font-bold text-lg">Prompt Template</h3>
+                <button onclick="copyText(S.currentPrompt.Prompt)" class="text-muted-foreground hover:text-foreground transition-colors" title="Copy Raw Base">
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <pre id="detail-prompt" class="whitespace-pre-wrap font-mono text-[13px] leading-relaxed p-4 bg-secondary/50 rounded-lg border border-border text-foreground"></pre>
+            </div>
+            <div id="detail-tags-wrap" class="flex flex-wrap gap-2"></div>
+          </div>
+
+          <div class="lg:col-span-1">
+            <div id="detail-var-section" class="bg-card border border-border rounded-xl p-6 shadow-sm sticky top-6">
+              <h3 class="font-heading font-bold text-lg mb-4 border-b border-border pb-3">Variables</h3>
+              <div id="detail-variables" class="flex flex-col gap-4 mb-6"></div>
+              <button onclick="fillAndCopy()" class="btn btn-primary w-full shadow-md">
+                <i data-lucide="copy" class="w-4 h-4"></i> Fill & Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDITOR PAGE -->
+    <div id="page-editor" class="page px-6 md:px-10 py-6">
+      <div class="max-w-6xl w-full mx-auto pb-20">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-border pb-6">
+          <div class="flex flex-col gap-1">
+            <button onclick="showPage('page-library', null, 'All Prompts')" class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground font-medium transition-colors w-fit mb-2">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> Cancel
+            </button>
+            <h2 id="editor-title" class="font-heading font-bold text-3xl tracking-tight text-foreground"></h2>
+          </div>
+          <button id="btn-save" onclick="savePrompt()" class="btn btn-primary px-8 shadow-md">
+            <i data-lucide="save" class="w-4 h-4"></i> Save Vault
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div class="lg:col-span-2 bg-card border border-border rounded-xl p-6 shadow-sm space-y-6">
+            <div>
+              <label class="block text-sm font-bold mb-2">Title</label>
+              <input type="text" id="edit-title" class="input-base text-lg font-medium h-12" placeholder="e.g. SEO Content Writer">
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-bold mb-2">Category</label>
+                <select id="edit-category" class="input-base bg-background" onchange="onCatChange()"></select>
+              </div>
+              <div id="edit-subcat-wrap">
+                <label class="block text-sm font-bold mb-2">Subcategory</label>
+                <select id="edit-subcategory" class="input-base bg-background"><option value="">— None —</option></select>
+              </div>
+              <div>
+                <label class="block text-sm font-bold mb-2">Model</label>
+                <input list="model-list" id="edit-model" class="input-base bg-background" placeholder="Select or type a model..." autocomplete="off">
+                <datalist id="model-list">
+                  <option>Claude 3.5 Sonnet</option>
+                  <option>GPT-4o</option>
+                  <option>Midjourney</option>
+                  <option>FLUX</option>
+                  <option>Any</option>
+                </datalist>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold mb-2 text-primary">Thumbnail Image URL <span class="font-normal text-muted-foreground ml-1 text-xs">(optional)</span></label>
+              <input type="text" id="edit-image" class="input-base bg-primary/5 focus-visible:ring-primary/50" placeholder="https://example.com/image.jpg">
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold mb-2">Tags <span class="font-normal text-muted-foreground ml-1 text-xs">(comma separated)</span></label>
+              <input type="text" id="edit-tags" class="input-base" placeholder="marketing, blog, seo">
+            </div>
+
+            <div>
+              <label class="flex items-center justify-between text-sm font-bold mb-2">
+                <span>Prompt Base template</span>
+                <span class="font-normal text-xs text-muted-foreground">Use <code class="bg-secondary px-1.5 py-0.5 rounded border border-border text-foreground font-mono">{{var}}</code></span>
+              </label>
+              <textarea id="edit-prompt" rows="10" class="input-base min-h-[200px] font-mono text-[13px] bg-secondary/30 pt-3" placeholder="You are an expert..."></textarea>
+            </div>
+
+            <div id="edit-neg-wrap" style="display:none">
+              <label class="block text-sm font-bold text-destructive mb-2">Negative Background Details</label>
+              <textarea id="edit-negative" rows="3" class="input-base min-h-[80px] bg-destructive/5 font-mono text-[13px] focus-visible:ring-destructive/40" placeholder="ugly, out of frame..."></textarea>
+            </div>
+          </div>
+
+          <div class="lg:col-span-1">
+            <div class="bg-card border border-border rounded-xl p-1 shadow-sm magic-glow sticky top-6">
+              <div class="bg-card rounded-[10px] p-5 h-full w-full z-10 relative">
+                <h3 class="font-heading font-bold text-lg mb-4 flex items-center gap-2 text-primary border-b border-border pb-3">
+                  <i data-lucide="sparkles" class="w-5 h-5"></i> Vault AI
+                </h3>
+                <p class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">Enhancements</p>
+                
+                <div class="flex flex-col gap-2.5">
+                  <button onclick="mockAI('enhance')" id="btn-ai-enhance" class="btn btn-secondary w-full justify-start border border-border hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium">
+                    <i data-lucide="wand-2" class="w-4 h-4 text-primary"></i> Enhance Structure
+                  </button>
+                  <button onclick="mockAI('categorize')" id="btn-ai-categorize" class="btn btn-secondary w-full justify-start border border-border hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium">
+                    <i data-lucide="tags" class="w-4 h-4 text-primary"></i> Auto-Tag & Sync
+                  </button>
+                  <button onclick="mockAI('generate')" id="btn-ai-generate" class="btn btn-secondary w-full justify-start border border-border hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium">
+                    <i data-lucide="zap" class="w-4 h-4 text-primary"></i> Generate Fresh
+                  </button>
+                </div>
+
+                <div class="mt-6">
+                  <label class="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">AI Execution Log</label>
+                  <textarea id="edit-notes" rows="5" class="input-base bg-secondary/50 text-[12px] resize-none focus-visible:ring-0 placeholder:text-muted-foreground/50 border-0" placeholder="Logs appear here..." readonly></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORIES PAGE -->
+    <div id="page-categories" class="page px-6 md:px-10 py-6">
+      <div class="max-w-4xl w-full mx-auto pb-20">
+        <h2 class="font-heading font-bold text-3xl tracking-tight mb-8">Category Manager</h2>
+
+        <div class="bg-card border-2 border-dashed border-border rounded-xl p-6 mb-8 flex flex-col md:flex-row items-start md:items-end gap-4 shadow-sm">
+          <div class="flex-1 space-y-2">
+            <h3 class="font-heading font-bold text-base">Add New Bucket</h3>
+            <p class="text-[13px] text-muted-foreground">Top-level categories for organizing prompts.</p>
+          </div>
+          <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="relative w-10 h-10 rounded-md overflow-hidden border border-border flex-shrink-0">
+              <input type="color" id="new-cat-color" value="#f59e0b" class="absolute -top-2 -left-2 w-16 h-16 cursor-pointer">
+            </div>
+            <input type="text" id="new-cat-name" class="input-base max-w-[200px]" placeholder="Category Name...">
+            <button onclick="addCategory()" class="btn btn-primary shadow-sm"><i data-lucide="plus" class="w-4 h-4"></i> Add</button>
+          </div>
+        </div>
+
+        <div id="cat-mgr-list" class="flex flex-col gap-4"></div>
+      </div>
+    </div>
+
+  </div> <!-- /relative flex-1 -->
+</main>
+
+<div id="toast" class="fixed bottom-6 right-6 bg-foreground text-background px-4 py-3 rounded-lg text-sm font-medium shadow-lg max-w-sm flex items-center gap-3 transition-opacity duration-300 opacity-0 pointer-events-none z-50">
+  <i data-lucide="check-circle" class="w-4 h-4 text-green-500"></i>
+  <span id="toast-msg">Success!</span>
+</div>
+
+<script>
+// ─── MOCK DATA ─────────────────────────────────────────────────────────────
+const MOCK_CATEGORIES = [
+  { name:'Marketing',       color:'#7c3aed', subcategories:['Email Marketing','Paid Ads','Brand Strategy'] },
+  { name:'Design',          color:'#f59e0b', subcategories:['App Icons','UI Mockups'] },
+  { name:'Copywriting',     color:'#f43f5e', subcategories:['Headlines','Product Descriptions','Landing Pages'] },
+  { name:'SEO',             color:'#0d9488', subcategories:['Blog Posts','Technical SEO','Link Building'] },
+  { name:'Social Media',    color:'#3b82f6', subcategories:['Instagram','LinkedIn','Twitter / X'] },
+  { name:'Image Generation',color:'#ea580c', subcategories:['Portraits','Landscapes','Product Shots'] },
+  { name:'Custom',          color:'#64748b', subcategories:[] }
+];
+
+const MOCK_PROMPTS = [
+  { PromptID:'1', Title:'SEO Blog Architect', Category:'SEO', Subcategory:'Blog Posts', Tags:'blog,seo', Model:'Claude 3.5 Sonnet', Prompt:'Write a comprehensive SEO blog post on {{topic}} targeting the keyword "{{keyword}}" for {{audience}}.', Variables:'[{"name":"topic","label":"Topic","placeholder":"AI tools"},{"name":"keyword","label":"Keyword","placeholder":"best AI tools 2025"},{"name":"audience","label":"Audience","placeholder":"marketers"}]' },
+  { PromptID:'2', Title:'Brand Voice Generator', Category:'Marketing', Subcategory:'Brand Strategy', Tags:'branding,voice', Model:'Claude 3.5 Sonnet', Prompt:'Define a brand voice for {{brand}} in the {{industry}} industry targeting {{audience}}.', Variables:'[{"name":"brand","label":"Brand","placeholder":"AcmeCo"},{"name":"industry","label":"Industry","placeholder":"SaaS"},{"name":"audience","label":"Audience","placeholder":"CTOs"}]' },
+  { PromptID:'3', Title:'Email Campaign', Category:'Marketing', Subcategory:'Email Marketing', Tags:'email,campaign', Model:'GPT-4o', Prompt:'Write a 5-email drip campaign for {{product}} targeting {{segment}}. Goal: {{goal}}.', Variables:'[{"name":"product","label":"Product","placeholder":"My SaaS"},{"name":"segment","label":"Segment","placeholder":"trial users"},{"name":"goal","label":"Goal","placeholder":"convert to paid"}]' },
+  { PromptID:'4', Title:'Instagram Reel Script', Category:'Social Media', Subcategory:'Instagram', Tags:'reels,video', Model:'Claude 3.5 Sonnet', Prompt:'Write a 60-second Reel script for {{brand}} about {{topic}} targeting {{audience}}.', Variables:'[{"name":"brand","label":"Brand","placeholder":"Notion"},{"name":"topic","label":"Topic","placeholder":"productivity"},{"name":"audience","label":"Audience","placeholder":"students"}]' },
+  { PromptID:'5', Title:'Cinematic Portrait', Category:'Image Generation', Subcategory:'Portraits', Tags:'portrait,midjourney', Model:'Midjourney', Prompt:'Portrait of {{subject}}, cinematic lighting, Hasselblad medium format, f/1.8, golden hour, {{location}} background.', NegativePrompt:'cartoon, CGI, blurry', ImageURL:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80', Variables:'[{"name":"subject","label":"Subject","placeholder":"30yo woman"},{"name":"location","label":"Location","placeholder":"Tokyo street"}]' },
+  { PromptID:'6', Title:'App Icon Design', Category:'Design', Subcategory:'App Icons', Tags:'icon,app', Model:'FLUX', Prompt:'Minimal app icon for {{app}}, a {{category}} app. Style: {{style}}. Primary color: {{color}}.', ImageURL:'https://images.unsplash.com/photo-1614332287897-cdc485fa562d?auto=format&fit=crop&w=600&q=80', Variables:'[{"name":"app","label":"App Name","placeholder":"Focusly"},{"name":"category","label":"Category","placeholder":"productivity"},{"name":"style","label":"Style","placeholder":"glassmorphism"},{"name":"color","label":"Color","placeholder":"deep purple"}]' },
+  { PromptID:'7', Title:'Product Description', Category:'Copywriting', Subcategory:'Product Descriptions', Tags:'ecommerce,copy', Model:'GPT-4o', Prompt:'Write a compelling product description for {{product}}. Key features: {{features}}. Target: {{audience}}.', Variables:'[{"name":"product","label":"Product","placeholder":"Wireless earbuds"},{"name":"features","label":"Features","placeholder":"40hr battery, ANC"},{"name":"audience","label":"Audience","placeholder":"commuters"}]' },
+  { PromptID:'8', Title:'LinkedIn Thought Leadership', Category:'Social Media', Subcategory:'LinkedIn', Tags:'linkedin,b2b', Model:'Claude 3.5 Sonnet', Prompt:'Write a LinkedIn post from the perspective of {{role}} about {{topic}}. Hook: {{hook_style}}.', Variables:'[{"name":"role","label":"Role","placeholder":"VP of Marketing"},{"name":"topic","label":"Topic","placeholder":"AI in B2B sales"},{"name":"hook_style","label":"Hook Style","placeholder":"controversial statement"}]' }
+];
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+const S = {
+  prompts: JSON.parse(JSON.stringify(MOCK_PROMPTS)),
+  categories: JSON.parse(JSON.stringify(MOCK_CATEGORIES)),
+  currentPrompt: null, activeCategory: null, activeSubcategory: null, theme: 'dark'
+};
+
+// ─── UTILS ─────────────────────────────────────────────────────────────────
+const esc = s => (s||'').replace(/'/g,"\\'").replace(/"/g,"&quot;");
+const css = s => (s||'').replace(/\s+/g,'-').toLowerCase();
+const safeStr = s => (s||'').replace(/[\r\n]/g,'\\n').replace(/'/g,"\\'");
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').innerText = msg;
+  t.classList.remove('opacity-0', 'pointer-events-none');
+  setTimeout(() => t.classList.add('opacity-0', 'pointer-events-none'), 2500);
+}
+
+function copyText(txt) {
+  navigator.clipboard.writeText(txt).then(() => showToast('Copied to clipboard'));
+}
+
+function toggleTheme() {
+  S.theme = S.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.className = S.theme;
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('mobile-overlay');
+  if (sidebar) sidebar.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('open');
+}
+
+// ─── CORE RENDERING ────────────────────────────────────────────────────────
+function init() {
+  renderSidebar();
+  renderLibrary();
+  lucide.createIcons();
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebar-cats'); el.innerHTML = '';
+  S.categories.forEach(cat => {
+    const hasSubs = cat.subcategories.length > 0;
+    const cid = css(cat.name);
+    el.innerHTML += `
+      <div class="flex flex-col group w-full">
+        <button onclick="selectCategory('${esc(cat.name)}')" class="flex items-center gap-3 w-full px-2 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all ${S.activeCategory === cat.name ? 'text-foreground bg-secondary/80 shadow-sm' : ''}">
+          <div class="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-border shadow-sm" style="background-color: ${cat.color}"></div>
+          <span class="flex-1 text-left truncate">${cat.name}</span>
+          ${hasSubs ? `<i data-lucide="chevron-down" id="arrow-${cid}" class="w-3.5 h-3.5 shrink-0 opacity-50 transition-transform"></i>` : ''}
+        </button>
+        ${hasSubs ? `<div id="subs-${cid}" class="flex flex-col gap-0.5 ml-6 mt-1 border-l border-border pl-2" style="display:none">
+          ${cat.subcategories.map(s => `
+            <button onclick="selectSubcategory('${esc(cat.name)}', '${esc(s)}', event)" class="flex items-center gap-2 w-full px-2 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-all ${(S.activeSubcategory===s && S.activeCategory===cat.name) ? 'text-primary bg-primary/10' : ''}">
+              <span class="truncate">${s}</span>
+            </button>
+          `).join('')}
+        </div>` : ''}
+      </div>
+    `;
+  });
+  highlightSidebar();
+}
+
+function selectCategory(name) {
+  S.activeCategory = name; S.activeSubcategory = null;
+  const subEl = document.getElementById('subs-' + css(name));
+  const arrEl = document.getElementById('arrow-' + css(name));
+  if (subEl) {
+    const open = subEl.style.display !== 'none';
+    subEl.style.display = open ? 'none' : 'flex';
+    if(arrEl) arrEl.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+  }
+  highlightSidebar();
+  showPage('page-library', null, name);
+}
+
+function selectSubcategory(cat, sub, e) {
+  e.stopPropagation();
+  S.activeCategory = cat; S.activeSubcategory = sub;
+  const subEl = document.getElementById('subs-' + css(cat));
+  const arrEl = document.getElementById('arrow-' + css(cat));
+  if (subEl) { subEl.style.display = 'flex'; if(arrEl) arrEl.style.transform = 'rotate(180deg)'; }
+  highlightSidebar();
+  showPage('page-library', null, `${cat} › ${sub}`);
+}
+
+function highlightSidebar() {
+  document.querySelectorAll('#nav-library').forEach(el => {
+    if(!S.activeCategory) { el.classList.add('text-foreground','bg-secondary/80'); el.classList.remove('text-muted-foreground'); }
+    else { el.classList.remove('text-foreground','bg-secondary/80'); el.classList.add('text-muted-foreground'); }
+  });
+  renderSidebar(); // re-rendering easily re-binds active classes
+  lucide.createIcons();
+}
+
+function showPage(pageId, data=null, title='') {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  if (title) document.getElementById('top-bar-title').innerText = title;
+
+  if (pageId === 'page-library') { renderLibrary(); renderFilterPills(); }
+  else if (pageId === 'page-detail' && data) { S.currentPrompt = data; renderDetail(data); }
+  else if (pageId === 'page-editor') { S.currentPrompt = data && !data.isNew ? data : null; renderEditor(S.currentPrompt); }
+  else if (pageId === 'page-categories') { renderCatMgr(); }
+  // Close sidebar on mobile after navigating
+  if (window.innerWidth < 768) toggleSidebar();
+  lucide.createIcons();
+}
+
+// ─── LIBRARY ───
+function renderFilterPills() {
+  const el = document.getElementById('filter-pills'); el.innerHTML = '';
+  const allActive = !S.activeCategory && !S.activeSubcategory;
+  
+  el.innerHTML += `<button onclick="S.activeCategory=null; S.activeSubcategory=null; renderLibrary(); renderSidebar(); showPage('page-library', null, 'All Prompts')" class="px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all border ${allActive ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:bg-secondary'}">All</button>`;
+  
+  S.categories.forEach(c => {
+    const active = S.activeCategory === c.name && !S.activeSubcategory;
+    el.innerHTML += `<button onclick="selectCategory('${esc(c.name)}')" class="px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all border" style="background-color: ${active ? c.color+'15' : 'transparent'}; border-color: ${active ? c.color : 'var(--border)'}; color: ${active ? c.color : 'var(--muted-foreground)'};">${c.name}</button>`;
+  });
+}
+
+function renderLibrary() {
+  renderFilterPills();
+  const grid = document.getElementById('library-grid'); grid.innerHTML = '';
+  let list = [...S.prompts];
+  if(S.activeSubcategory) list = list.filter(p => p.Category===S.activeCategory && p.Subcategory===S.activeSubcategory);
+  else if(S.activeCategory) list = list.filter(p => p.Category===S.activeCategory);
+  
+  const q = document.getElementById('search-input').value.toLowerCase();
+  if(q) list = list.filter(p => (p.Title||'').toLowerCase().includes(q) || (p.Tags||'').toLowerCase().includes(q) || (p.Prompt||'').toLowerCase().includes(q));
+  
+  if(!list.length) { grid.innerHTML = `<div class="col-span-full py-16 flex flex-col items-center justify-center text-muted-foreground border border-dashed border-border rounded-xl bg-secondary/20"><i data-lucide="package-open" class="w-10 h-10 mb-3 opacity-50"></i><p class="text-sm font-medium">No prompts found.</p></div>`; return; }
+
+  list.forEach((p, i) => {
+    const cat = S.categories.find(c => c.name===p.Category);
+    const col = cat ? cat.color : '#64748b';
+    const tags = (p.Tags||'').split(',').slice(0,3).filter(t=>t.trim()).map(t=>`<span class="text-[9px] uppercase font-bold tracking-widest text-muted-foreground px-2 py-0.5 rounded-sm bg-secondary">${t.trim()}</span>`).join('');
+    // Animate list stagger natively
+    const delay = i * 0.05;
+    
+    grid.innerHTML += `
+      <div onclick="showPage('page-detail', S.prompts.find(x=>x.PromptID==='${p.PromptID}'), '${esc(p.Title)}')" class="group relative bg-card border border-border hover:border-muted-foreground/40 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col animate-slide-up" style="animation-delay: ${delay}s; opacity: 0; animation-fill-mode: forwards;">
+        <div class="absolute top-0 left-0 w-full h-[3px]" style="background-color: ${col}"></div>
+        ${p.ImageURL ? `<div class="w-full h-36 border-b border-border bg-cover bg-center" style="background-image: url('${p.ImageURL}')"></div>` : ''}
+        <div class="p-5 flex flex-col flex-1 gap-4">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="font-heading font-bold text-[17px] leading-snug line-clamp-2 text-foreground pr-2">${p.Title||'Untitled'}</h3>
+            <button onclick="event.stopPropagation(); copyText('${safeStr(p.Prompt)}')" class="p-1.5 rounded-md bg-secondary text-muted-foreground hover:bg-primary/20 hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100 mt-0.5"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+            <span class="px-2 py-0.5 rounded-full border" style="color: ${col}; border-color: ${col}40; background-color: ${col}10">${p.Category}${p.Subcategory ? ' / '+p.Subcategory : ''}</span>
+            <span class="text-muted-foreground">·</span>
+            <span class="text-muted-foreground">${p.Model||'—'}</span>
+          </div>
+          <div class="text-[12px] text-muted-foreground font-mono leading-relaxed line-clamp-3 bg-secondary/40 p-3 rounded-lg border border-border mt-auto">
+            ${(p.Prompt||'').replace(/</g,'&lt;')}
+          </div>
+          ${tags ? `<div class="flex flex-wrap gap-1.5 mt-2">${tags}</div>` : ''}
+        </div>
+      </div>
+    `;
+  });
+  lucide.createIcons();
+}
+
+// ─── DETAIL ───
+function renderDetail(p) {
+  document.getElementById('detail-title').innerText = p.Title||'Untitled';
+  document.getElementById('detail-meta').innerHTML = `
+    <span class="px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground text-xs uppercase tracking-wider font-bold border border-border">${p.Category}${p.Subcategory?' / '+p.Subcategory:''}</span>
+    <span class="text-muted-foreground">·</span>
+    <span class="text-muted-foreground">${p.Model}</span>
+  `;
+  const img = document.getElementById('detail-image');
+  if(p.ImageURL) { img.style.display='block'; img.style.backgroundImage=`url('${p.ImageURL}')`; } else { img.style.display='none'; }
+  document.getElementById('detail-prompt').innerText = p.Prompt||'';
+  
+  const tw = document.getElementById('detail-tags-wrap'); tw.innerHTML='';
+  (p.Tags||'').split(',').filter(x=>x.trim()).forEach(t => {
+    tw.innerHTML += `<span class="px-3 py-1 rounded-full bg-secondary border border-border text-xs font-semibold uppercase tracking-widest text-muted-foreground">${t.trim()}</span>`;
+  });
+
+  const vc = document.getElementById('detail-variables'); vc.innerHTML='';
+  let vars=[]; try{vars=JSON.parse(p.Variables||'[]')}catch(e){}
+  if(vars.length) {
+    document.getElementById('detail-var-section').style.display = 'block';
+    vars.forEach(v => {
+      vc.innerHTML += `
+        <div>
+          <label class="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1.5">${v.label||v.name}</label>
+          <input type="text" class="var-input input-base bg-background h-9" data-var="${v.name}" placeholder="${v.placeholder||''}">
+        </div>`;
+    });
+  } else {
+    document.getElementById('detail-var-section').style.display = 'none';
+  }
+}
+
+function fillAndCopy() {
+  let t = S.currentPrompt.Prompt;
+  document.querySelectorAll('.var-input').forEach(i => t = t.replace(new RegExp(`{{${i.dataset.var}}}`, 'g'), i.value||i.placeholder||''));
+  copyText(t);
+}
+
+function deleteCurrentPrompt() {
+  if(!confirm('Delete this prompt forever?')) return;
+  S.prompts = S.prompts.filter(x => x.PromptID !== S.currentPrompt.PromptID);
+  showPage('page-library', null, 'All Prompts'); showToast('Prompt deleted');
+}
+
+// ─── EDITOR ───
+function renderEditor(p) {
+  document.getElementById('editor-title').innerText = p ? 'Complete Vault Entry' : 'New Vault Entry';
+  document.getElementById('edit-title').value = p?.Title||'';
+  document.getElementById('edit-tags').value = p?.Tags||'';
+  document.getElementById('edit-prompt').value = p?.Prompt||'';
+  document.getElementById('edit-negative').value = p?.NegativePrompt||'';
+  document.getElementById('edit-image').value = p?.ImageURL||'';
+  document.getElementById('edit-notes').value = p?.ImprovementNotes||'';
+  
+  const catSel = document.getElementById('edit-category'); catSel.innerHTML='';
+  S.categories.forEach(c => catSel.innerHTML += `<option value="${c.name}">${c.name}</option>`);
+  if(p?.Category) catSel.value = p.Category;
+  if(p?.Model) document.getElementById('edit-model').value = p.Model;
+  onCatChange();
+  if(p?.Subcategory) document.getElementById('edit-subcategory').value = p.Subcategory;
+}
+
+function onCatChange() {
+  const cat = document.getElementById('edit-category').value;
+  const catObj = S.categories.find(c => c.name === cat);
+  const subSel = document.getElementById('edit-subcategory');
+  subSel.innerHTML = '<option value="">— None —</option>';
+  (catObj?.subcategories||[]).forEach(s => subSel.innerHTML += `<option value="${s}">${s}</option>`);
+  document.getElementById('edit-neg-wrap').style.display = (cat === 'Image Generation') ? 'block' : 'none';
+}
+
+function savePrompt() {
+  const btn = document.getElementById('btn-save');
+  btn.classList.add('opacity-50', 'pointer-events-none');
+  btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Saving...`;
+  lucide.createIcons();
+  
+  setTimeout(() => {
+    const p = S.currentPrompt ? {...S.currentPrompt} : {};
+    if(!p.PromptID) p.PromptID = String(Date.now());
+    p.Title = document.getElementById('edit-title').value;
+    p.Category = document.getElementById('edit-category').value;
+    p.Subcategory = document.getElementById('edit-subcategory').value;
+    p.Tags = document.getElementById('edit-tags').value;
+    p.Model = document.getElementById('edit-model').value;
+    p.Prompt = document.getElementById('edit-prompt').value;
+    p.ImageURL = document.getElementById('edit-image').value;
+    if(p.Category==='Image Generation') p.NegativePrompt = document.getElementById('edit-negative').value;
+    
+    const vm = [...(p.Prompt||'').matchAll(/{{(.*?)}}/g)];
+    p.Variables = JSON.stringify(vm.map(m => ({name: m[1], label: m[1], placeholder: `Enter ${m[1]}`})));
+    
+    const idx = S.prompts.findIndex(x => x.PromptID === p.PromptID);
+    if(idx > -1) S.prompts[idx] = p; else S.prompts.unshift(p);
+    
+    btn.classList.remove('opacity-50', 'pointer-events-none');
+    btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Save Vault`;
+    
+    showPage('page-library', null, 'All Prompts'); showToast('Prompt saved successfully');
+  }, 600);
+}
+
+function mockAI(type) {
+  const btn = document.getElementById(`btn-ai-${type}`);
+  const oldHTML = btn.innerHTML;
+  btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-primary"></i> Interacting...`;
+  lucide.createIcons();
+  
+  setTimeout(() => {
+    btn.innerHTML = oldHTML;
+    lucide.createIcons();
+    const raw = document.getElementById('edit-prompt').value;
+    
+    if(type === 'enhance') {
+      if(!raw) return alert('Draft a prompt base first.');
+      document.getElementById('edit-prompt').value += '\n\nFormat responses clearly using markdown. Prioritize actionable insights over filler copy.';
+      document.getElementById('edit-notes').value = '• Increased instruction fidelity\n• Added markdown formatting directive\n• Shortened redundant statements';
+      showToast('Enhanced prompt structure');
+    } else if(type === 'categorize') {
+      if(!raw) return alert('Draft a prompt base first.');
+      document.getElementById('edit-category').value = 'Marketing'; onCatChange();
+      document.getElementById('edit-tags').value = 'ai, strategy, planning';
+      showToast('Auto-tagged accurately');
+    } else {
+      const d = prompt('What kind of prompt are you looking to build?');
+      if(!d) return;
+      document.getElementById('edit-title').value = d.charAt(0).toUpperCase() + d.slice(1) + ' Assistant';
+      document.getElementById('edit-prompt').value = `Act as an expert in ${d} with an authoritative yet accessible tone.\n\nGuide the user systematically through the core principles to achieve {{goal}}. Ask clarifying questions if context is missing.`;
+      document.getElementById('edit-tags').value = 'generated, template';
+      showToast('New prompt generated');
+    }
+  }, 1200);
+}
+
+// ─── CATEGORIES ───
+function renderCatMgr() {
+  const cList = document.getElementById('cat-mgr-list'); cList.innerHTML = '';
+  S.categories.forEach(cat => {
+    const cnt = S.prompts.filter(p => p.Category === cat.name).length;
+    cList.innerHTML += `
+      <div class="bg-card border border-border rounded-xl shadow-sm overflow-hidden animate-slide-up">
+        <div class="bg-secondary/40 border-b border-border p-4 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <i data-lucide="grip-vertical" class="w-5 h-5 text-muted-foreground/30 hidden sm:block"></i>
+            <div class="w-4 h-4 rounded-full ring-2 ring-background border border-black/10" style="background-color: ${cat.color}"></div>
+            <h3 class="font-heading font-bold text-lg">${cat.name}</h3>
+            <span class="text-[10px] font-bold uppercase tracking-wider bg-background px-2 py-0.5 rounded border border-border text-muted-foreground">${cnt} Prompt${cnt!==1?'s':''}</span>
+          </div>
+          <button onclick="deleteCategory('${esc(cat.name)}')" class="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        </div>
+        <div class="p-5">
+          <h4 class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Subcategories</h4>
+          <div class="flex flex-wrap gap-2 mb-4">
+            ${cat.subcategories.map(s => `
+              <span class="flex items-center gap-2 px-3 py-1 bg-secondary border border-border rounded-full text-xs font-semibold">
+                ${s}
+                <button onclick="deleteSubcat('${esc(cat.name)}', '${esc(s)}')" class="text-muted-foreground hover:text-destructive"><i data-lucide="x" class="w-3 h-3"></i></button>
+              </span>
+            `).join('')}
+            ${cat.subcategories.length === 0 ? `<span class="text-sm text-muted-foreground italic">No subcategories defined.</span>` : ''}
+          </div>
+          <div class="flex items-center gap-2 max-w-sm mt-4">
+            <input type="text" id="addsub-${css(cat.name)}" class="input-base h-9 text-sm" placeholder="New subcategory label...">
+            <button onclick="addSubcat('${esc(cat.name)}')" class="btn btn-secondary btn-sm h-9 px-4">Add <i data-lucide="plus" class="w-3.5 h-3.5 ml-1"></i></button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  lucide.createIcons();
+}
+
+function addCategory() {
+  const n = document.getElementById('new-cat-name').value.trim();
+  const col = document.getElementById('new-cat-color').value;
+  if(!n) return;
+  if(S.categories.find(c => c.name.toLowerCase() === n.toLowerCase())) return alert('Exists');
+  S.categories.push({name: n, color: col, subcategories: []});
+  document.getElementById('new-cat-name').value = '';
+  renderCatMgr(); renderSidebar();
+}
+
+function deleteCategory(name) {
+  if(!confirm(`Delete "${name}" and un-assign its prompts?`)) return;
+  S.categories = S.categories.filter(c => c.name !== name);
+  renderCatMgr(); renderSidebar();
+}
+
+function addSubcat(catName) {
+  const el = document.getElementById('addsub-' + css(catName));
+  const val = el.value.trim();
+  if(!val) return;
+  const cat = S.categories.find(c => c.name === catName);
+  if(cat.subcategories.includes(val)) return alert('Exists');
+  cat.subcategories.push(val);
+  renderCatMgr(); renderSidebar();
+}
+
+function deleteSubcat(catName, sub) {
+  const cat = S.categories.find(c => c.name === catName);
+  cat.subcategories = cat.subcategories.filter(s => s !== sub);
+  renderCatMgr(); renderSidebar();
+}
+
+// ─── BOOT ───
+window.onload = init;
+</script>
+</body>
+</html>

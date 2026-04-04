@@ -1,0 +1,637 @@
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────
+const S = {
+  prompts: [],
+  cats: [],
+  models: ['Claude 3.5 Sonnet','Claude 3.7 Sonnet','GPT-4o','GPT-4.1','Gemini 2.5 Pro','Midjourney','FLUX','Any'],
+  activeCat: null, activeSub: null, cur: null, theme: 'dark'
+};
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const e  = s  => (s||'').replace(/</g,'&lt;').replace(/'/g,"\\'");
+const se = s  => (s||'').replace(/[\r\n]/g,'\\n').replace(/'/g,"\\'");
+const cid = s => (s||'').replace(/\s+/g,'-').toLowerCase();
+
+function toast(msg) {
+  $('toast-msg').textContent = msg;
+  $('toast').classList.add('visible');
+  setTimeout(()=>$('toast').classList.remove('visible'), 2500);
+}
+function copyText(t) { navigator.clipboard.writeText(t).then(()=>toast('Copied!')); }
+
+// Custom modal — replaces confirm() which is blocked in GAS iframes on mobile
+function confirmAction(msg, onConfirm, onCancel) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `<div style="background:var(--bg);border:2px solid var(--border);padding:28px;max-width:340px;width:100%">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:700;text-transform:uppercase;margin-bottom:24px;line-height:1.5">${msg}</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button id="_mc" class="btn btn-secondary">Cancel</button>
+      <button id="_mo" class="btn btn-primary">Confirm</button>
+    </div></div>`;
+  document.body.appendChild(modal);
+  const done = () => document.body.removeChild(modal);
+  modal.querySelector('#_mo').onclick = () => { done(); onConfirm(); };
+  modal.querySelector('#_mc').onclick = () => { done(); if(onCancel) onCancel(); };
+  modal.onclick = e => { if(e.target===modal) { done(); if(onCancel) onCancel(); } };
+}
+// Modal with 3 choices: btn1 (primary), btn2 (secondary), cancel
+function choiceModal(msg, btn1Label, btn2Label, onBtn1, onBtn2) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `<div style="background:var(--bg);border:2px solid var(--border);padding:28px;max-width:360px;width:100%">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:0.9rem;font-weight:700;text-transform:uppercase;margin-bottom:24px;line-height:1.5">${msg}</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button id="_mb1" class="btn btn-primary" style="width:100%">${btn1Label}</button>
+      <button id="_mb2" class="btn btn-secondary" style="width:100%">${btn2Label}</button>
+      <button id="_mbc" class="btn btn-ghost" style="width:100%">Cancel</button>
+    </div></div>`;
+  document.body.appendChild(modal);
+  const done = () => document.body.removeChild(modal);
+  modal.querySelector('#_mb1').onclick = () => { done(); onBtn1(); };
+  modal.querySelector('#_mb2').onclick = () => { done(); onBtn2(); };
+  modal.querySelector('#_mbc').onclick = () => done();
+  modal.onclick = e => { if(e.target===modal) done(); };
+}
+function toggleTheme() {
+  S.theme = S.theme==='dark'?'light':'dark';
+  document.documentElement.className = S.theme;
+  const btn = $('theme-btn');
+  btn.innerHTML = S.theme==='dark' ? '<i data-lucide="moon"></i>' : '<i data-lucide="sun"></i>';
+  lucide.createIcons();
+}
+function toggleSidebar() {
+  const sidebar = $('sidebar');
+  const overlay = $('mobile-overlay');
+  if(sidebar) sidebar.classList.toggle('open');
+  if(overlay) overlay.classList.toggle('open');
+}
+function closeSidebar() {
+  const sidebar = $('sidebar');
+  const overlay = $('mobile-overlay');
+  if(sidebar) sidebar.classList.remove('open');
+  if(overlay) overlay.classList.remove('open');
+}
+
+// ── MEDIA UPLOAD ──────────────────────────────────────────────────────────
+function handleMediaFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    $('edit-img').value = '';
+    showMediaPreview(ev.target.result);
+    toast('Image uploaded');
+  };
+  reader.readAsDataURL(file);
+  $('media-file-input').value = '';
+}
+function handleMediaURL(url) {
+  if (!url || !url.trim()) { hideMediaPreview(); return; }
+  const trimmed = url.trim();
+  // Show preview; onerror will catch non-image URLs
+  showMediaPreview(trimmed);
+}
+function showMediaPreview(src) {
+  const wrap = $('media-preview-wrap');
+  const img = $('edit-img-preview');
+  img.src = src;
+  img.dataset.src = src;
+  img.onerror = function() {
+    // Not a valid image URL — hide preview and warn user
+    wrap.style.display = 'none';
+    img.src = ''; img.dataset.src = '';
+    toast('That URL is not a direct image link. Use an image URL ending in .jpg, .png, .webp etc.');
+  };
+  img.onload = function() {
+    wrap.style.display = 'block'; // Only show when image loads OK
+  };
+  wrap.style.display = 'none'; // Hidden until confirmed loaded
+}
+function hideMediaPreview() {
+  const wrap = $('media-preview-wrap');
+  const img = $('edit-img-preview');
+  if (wrap) wrap.style.display = 'none';
+  if (img) { img.src = ''; img.dataset.src = ''; img.onerror = null; img.onload = null; }
+}
+function clearMedia() {
+  $('edit-img').value = '';
+  hideMediaPreview();
+  toast('Image removed');
+}
+
+// ── MODEL COMBOBOX ────────────────────────────────────────────────────────
+function renderModelDropdown(filter) {
+  const dd = $('model-cb-dropdown');
+  const q = (filter || '').toLowerCase();
+  const filtered = S.models.filter(m => !q || m.toLowerCase().includes(q));
+  let html = '';
+  if (filtered.length) {
+    filtered.forEach(m => {
+      html += `<div class="model-cb-item" onclick="selectModel('${e(m)}')">
+        <span>${m}</span>
+        <button class="cb-del" onclick="event.stopPropagation(); removeModel('${e(m)}')" title="Remove">&times;</button>
+      </div>`;
+    });
+  } else {
+    html += `<div class="model-cb-empty">No models match</div>`;
+  }
+  const val = $('edit-model').value.trim();
+  const exactMatch = S.models.some(m => m.toLowerCase() === val.toLowerCase());
+  if (val && !exactMatch) {
+    html += `<div class="model-cb-add" style="display:flex" onclick="addModel()">
+      <span>+ Add "${val}" to list</span>
+    </div>`;
+  }
+  dd.innerHTML = html;
+}
+function openModelCB() {
+  $('model-cb').classList.add('open');
+  renderModelDropdown($('edit-model').value);
+  lucide.createIcons();
+}
+function closeModelCB() { $('model-cb').classList.remove('open'); }
+function toggleModelCB() {
+  const cb = $('model-cb');
+  if (cb.classList.contains('open')) closeModelCB(); else openModelCB();
+}
+function filterModels() { openModelCB(); renderModelDropdown($('edit-model').value); }
+function selectModel(name) { $('edit-model').value = name; closeModelCB(); }
+function addModel() {
+  const val = $('edit-model').value.trim();
+  if (!val) return;
+  if (!S.models.some(m => m.toLowerCase() === val.toLowerCase())) {
+    S.models.push(val); toast('Model "' + val + '" added');
+  }
+  closeModelCB();
+}
+function removeModel(name) {
+  S.models = S.models.filter(m => m !== name);
+  renderModelDropdown($('edit-model').value); toast('Model removed');
+}
+document.addEventListener('click', function(ev) {
+  const cb = document.getElementById('model-cb');
+  if (cb && !cb.contains(ev.target)) closeModelCB();
+});
+function showPage(name, data=null, title='') {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  $('page-'+name).classList.add('active');
+  if(title) $('topbar-title').textContent = title;
+  if(name==='library')    { renderLibrary(); renderPills(); }
+  if(name==='detail'&&data){ S.cur=data; renderDetail(data); }
+  if(name==='editor')     { S.cur=data&&!data._new?data:null; renderEditor(S.cur); }
+  if(name==='categories') { renderCats(); renderArchive(); }
+  lucide.createIcons();
+  // Close sidebar on mobile when navigating (never open it — that's only via the hamburger button)
+  if(window.innerWidth < 768) closeSidebar();
+}
+function navAll() {
+  S.activeCat=null; S.activeSub=null;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  $('nav-all').classList.add('active');
+  closeSidebar();
+  showPage('library',null,'All Prompts');
+}
+
+// ── INITIALIZATION ────────────────────────────────────────────────────────
+function init() {
+  google.script.run.withSuccessHandler(config => {
+    S.cats = config.categories.map(c => ({
+      name: c.name, color: c.color, subs: c.subcategories || []
+    }));
+    
+    // Display user email in sidebar
+    if (config.userEmail) {
+      const emailEl = $('user-email-display');
+      if (emailEl) emailEl.textContent = config.userEmail;
+    }
+    
+    google.script.run.withSuccessHandler(prompts => {
+      S.prompts = prompts.map(p => ({
+        id: String(p.PromptID),
+        title: p.Title||'',
+        cat: p.Category||'',
+        sub: p.Subcategory||'',
+        tags: p.Tags||'',
+        model: p.Model||'',
+        prompt: p.Prompt||'',
+        img: p.ImageURL||'',
+        neg: p.NegativePrompt||'',
+        vars: (()=>{ try{return JSON.parse(p.Variables||'[]')}catch(e){return []} })()
+      }));
+      renderSidebar();
+      renderLibrary();
+      lucide.createIcons();
+    }).getAllPrompts();
+  }).getAppConfig();
+}
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const el = $('sidebar-cats'); el.innerHTML = '';
+  S.cats.forEach(cat => {
+    const hasSubs = cat.subs.length > 0;
+    const isActive = S.activeCat === cat.name;
+    el.innerHTML += `
+      <div>
+        <button onclick="selCat('${e(cat.name)}')" class="cat-row${isActive?' active':''}" style="width:100%">
+          <div class="cat-dot" style="background:${cat.color}"></div>
+          <span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat.name}</span>
+          ${hasSubs?`<i data-lucide="chevron-down" id="arr-${cid(cat.name)}" style="width:14px;height:14px;flex-shrink:0;opacity:0.5;transition:transform 0.2s;${isActive?'transform:rotate(180deg)':''}"></i>`:''}
+        </button>
+        ${hasSubs?`<div id="subs-${cid(cat.name)}" class="cat-subs" style="display:${isActive?'flex':'none'}">
+          ${cat.subs.map(s=>`<button onclick="selSub('${e(cat.name)}','${e(s)}',event)" class="sub-btn${(S.activeSub===s&&isActive)?' active':''}">${s}</button>`).join('')}
+        </div>`:''}
+      </div>`;
+  });
+  lucide.createIcons();
+}
+function selCat(name) {
+  S.activeCat = name; S.activeSub = null;
+  const subEl = $('subs-'+cid(name)); const arrEl = $('arr-'+cid(name));
+  if(subEl){ const open = subEl.style.display!=='none'; subEl.style.display=open?'none':'flex'; if(arrEl) arrEl.style.transform=open?'rotate(0)':'rotate(180deg)'; }
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  renderSidebar();
+  showPage('library',null,name);
+}
+function selSub(cat,sub,ev) {
+  ev.stopPropagation();
+  S.activeCat=cat; S.activeSub=sub;
+  renderSidebar();
+  showPage('library',null,`${cat} › ${sub}`);
+}
+
+// ── LIBRARY ───────────────────────────────────────────────────────────────
+function renderPills() {
+  const wrap = $('filter-pills'); wrap.innerHTML='';
+  const allActive = !S.activeCat && !S.activeSub;
+  wrap.innerHTML += `<button class="pill${allActive?' all-active':''}" onclick="navAll()">All</button>`;
+  S.cats.forEach(c=>{
+    const active = S.activeCat===c.name && !S.activeSub;
+    wrap.innerHTML += `<button class="pill" onclick="selCat('${e(c.name)}')"
+      style="background-color:${active?c.color+'18':'transparent'};border-color:${active?c.color:'var(--border)'};color:${active?c.color:'var(--muted-fg)'}">
+      ${c.name}</button>`;
+  });
+}
+function renderLibrary() {
+  renderPills();
+  const grid = $('library-grid'); grid.innerHTML='';
+  let list = [...S.prompts];
+  if(S.activeSub) list = list.filter(p=>p.cat===S.activeCat&&p.sub===S.activeSub);
+  else if(S.activeCat) list = list.filter(p=>p.cat===S.activeCat);
+  const q = $('search-input').value.toLowerCase();
+  if(q) list = list.filter(p=>(p.title||'').toLowerCase().includes(q)||(p.tags||'').toLowerCase().includes(q)||(p.prompt||'').toLowerCase().includes(q));
+  
+  if(!list.length){ grid.innerHTML=`<div style="grid-column:1/-1;padding:64px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--muted-fg)">No prompts found.</div>`; return; }
+  
+  list.forEach((p,i)=>{
+    const cat = S.cats.find(c=>c.name===p.cat); const col = cat?cat.color:'#64748b';
+    const tags = (p.tags||'').split(',').slice(0,3).filter(t=>t.trim()).map(t=>`<span class="tag-chip">${t.trim()}</span>`).join('');
+    grid.innerHTML += `
+      <div class="prompt-card card-animate" style="animation-delay:${i*0.05}s" onclick="openDetail('${p.id}')">
+        <div class="card-top-bar" style="background:${col}"></div>
+        ${p.img?`<div class="card-img" style="background-image:url('${p.img}')"></div>`:''}
+        <div class="card-body">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <div class="card-title">${p.title||'Untitled'}</div>
+            <button class="card-copy-btn" onclick="event.stopPropagation();copyText('${se(p.prompt)}')"><i data-lucide="copy"></i></button>
+          </div>
+          <div class="card-meta">
+            <span class="card-cat-pill" style="color:${col};border-color:${col}40;background:${col}12">${p.cat}${p.sub?' / '+p.sub:''}</span>
+            <span class="card-dot">·</span>
+            <span class="card-model">${p.model||'—'}</span>
+          </div>
+          <div class="card-preview">${(p.prompt||'').replace(/</g,'&lt;')}</div>
+          ${tags?`<div class="card-tags">${tags}</div>`:''}
+        </div>
+      </div>`;
+  });
+  lucide.createIcons();
+}
+function openDetail(id) {
+  const p = S.prompts.find(x=>x.id===id);
+  if(!p) return;
+  showPage('detail',p,p.title);
+}
+
+// ── DETAIL ───────────────────────────────────────────────────────────────
+function renderDetail(p) {
+  $('detail-title').textContent = p.title||'Untitled';
+  const cat = S.cats.find(c=>c.name===p.cat); const col=cat?cat.color:'#64748b';
+  $('detail-meta').innerHTML = `<span style="padding:3px 12px;border-radius:99px;background:${col}15;color:${col};border:1px solid ${col}40;font-size:0.75rem;font-weight:600">${p.cat}${p.sub?' / '+p.sub:''}</span><span style="color:var(--muted-fg)">·</span><span>${p.model||'—'}</span>`;
+  const hero = $('detail-hero');
+  if(p.img){ hero.src=p.img;hero.style.display='block'; } else{ hero.style.display='none'; }
+  $('detail-prompt').textContent = p.prompt||'';
+  $('detail-tags').innerHTML = (p.tags||'').split(',').filter(t=>t.trim()).map(t=>`<span class="tag-chip" style="font-size:0.78rem;padding:4px 12px">${t.trim()}</span>`).join('');
+  const vc=$('detail-vars'); vc.innerHTML='';
+  const vars=p.vars||[];
+  if(vars.length){ $('detail-var-panel').style.display='block'; vars.forEach(v=>{ vc.innerHTML+=`<div class="field-group"><label class="section-micro">${v.l||v.n}</label><input type="text" class="input var-inp" style="height:36px" data-var="${v.n}" placeholder="${v.p||''}"></div>`; }); }
+  else { $('detail-var-panel').style.display='none'; }
+}
+function fillCopy() {
+  let t=S.cur.prompt;
+  document.querySelectorAll('.var-inp').forEach(i=>{ t=t.replace(new RegExp(`\\{\\{${i.dataset.var}\\}\\}`, 'g'), i.value||i.placeholder||''); });
+  copyText(t);
+}
+function editCurrent(){ showPage('editor',S.cur,'Edit Prompt'); }
+function deleteCurrent(){
+  confirmAction('Delete this prompt forever?', () => {
+    const pData = S.cur;
+    S.prompts = S.prompts.filter(x=>x.id!==pData.id);
+    showPage('library',null,'All Prompts');
+    toast('Deleting...');
+    google.script.run
+      .withSuccessHandler(()=>{ toast('Deleted'); })
+      .withFailureHandler(err=>{ toast('Delete failed: ' + (err && err.message || 'Unknown error')); })
+      .deletePrompt(pData.id, pData.cat);
+  });
+}
+
+// ── EDITOR ───────────────────────────────────────────────────────────────
+function renderEditor(p) {
+  $('editor-title').textContent = p?'Edit Prompt':'New Prompt';
+  $('edit-title').value=p?.title||''; $('edit-tags').value=p?.tags||'';
+  $('edit-prompt').value=p?.prompt||''; $('edit-neg').value=p?.neg||'';
+  $('edit-img').value=p?.img||'';
+  if(p?.img) { showMediaPreview(p.img); } else { hideMediaPreview(); }
+  $('edit-notes').value=p?.notes||'';
+  const catSel=$('edit-cat'); catSel.innerHTML='';
+  S.cats.forEach(c=>catSel.innerHTML+=`<option value="${c.name}">${c.name}</option>`);
+  if(p?.cat) catSel.value=p.cat;
+  $('edit-model').value=p?.model||'';
+  onCatChange();
+  if(p?.sub) $('edit-subcat').value=p.sub;
+}
+function onCatChange(){
+  const cat=$('edit-cat').value; const c=S.cats.find(x=>x.name===cat);
+  const sub=$('edit-subcat'); sub.innerHTML='<option value="">— None —</option>';
+  (c?.subs||[]).forEach(s=>sub.innerHTML+=`<option value="${s}">${s}</option>`);
+  $('neg-wrap').style.display=(cat==='Image Generation')?'block':'none';
+}
+function savePrompt(){
+  const btn=$('btn-save'); const old=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<span class="spinner"><i data-lucide="loader-2"></i></span> Saving...'; lucide.createIcons();
+  
+  const p = S.cur&&!S.cur._new ? {...S.cur} : {};
+  if(!p.id) p.id=String(Date.now());
+  p.title=$('edit-title').value; p.cat=$('edit-cat').value; p.sub=$('edit-subcat').value;
+  p.tags=$('edit-tags').value; p.model=$('edit-model').value; p.prompt=$('edit-prompt').value;
+  if(p.cat==='Image Generation') p.neg=$('edit-neg').value;
+  const matches=[...(p.prompt||'').matchAll(/{{(.*?)}}/g)];
+  p.vars=[...new Map(matches.map(m=>{
+    const raw=m[1], label=raw.charAt(0).toUpperCase()+raw.slice(1);
+    return [raw,{n:raw,l:label,p:`Enter ${label}`}];
+  })).values()];
+
+  // Determine image source: base64 upload vs URL
+  const previewSrc = $('edit-img-preview').dataset.src || '';
+  const urlValue = $('edit-img').value.trim();
+  const isBase64 = previewSrc.startsWith('data:image/');
+
+  function finishSave(imageURL) {
+    p.img = imageURL || '';
+    const idx=S.prompts.findIndex(x=>x.id===p.id);
+    if(idx>-1) S.prompts[idx]=p; else S.prompts.unshift(p);
+    
+    const backendPayload = {
+      PromptID: p.id, Title: p.title, Category: p.cat, Subcategory: p.sub,
+      Tags: p.tags, Model: p.model, Prompt: p.prompt,
+      ImageURL: p.img, NegativePrompt: p.neg,
+      Variables: JSON.stringify(p.vars)
+    };
+    
+    google.script.run.withSuccessHandler(()=>{
+      btn.disabled=false; btn.innerHTML=old; lucide.createIcons();
+      showPage('library',null,'All Prompts'); 
+      toast('Saved!');
+    }).withFailureHandler(err=>{
+      btn.disabled=false; btn.innerHTML=old; lucide.createIcons();
+      toast('Save failed: ' + (err && err.message ? err.message : 'Unknown error. Check Apps Script logs.'));
+    }).savePrompt(backendPayload);
+  }
+
+  if (isBase64) {
+    // Upload to Google Drive first, then save with the Drive URL
+    toast('Uploading image...');
+    google.script.run.withSuccessHandler(driveUrl => {
+      finishSave(driveUrl);
+    }).withFailureHandler(err => {
+      // Fallback: save without image
+      toast('Image upload failed, saving without image');
+      finishSave('');
+    }).uploadImageToDrive(previewSrc, p.title || 'prompt-image');
+  } else {
+    finishSave(urlValue);
+  }
+}
+function mockAI(type){
+  const btnId={enhance:'btn-enhance',tag:'btn-tag',gen:'btn-gen'}[type];
+  const btn=$(btnId); const old=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<span class="spinner"><i data-lucide="loader-2"></i></span> Working...'; lucide.createIcons();
+
+  const raw=$('edit-prompt').value;
+  const handlers = {
+    enhance: { fn: 'enhancePrompt', args: [raw] },
+    tag: { fn: 'categorizePrompt', args: [raw] },
+    gen: { fn: 'generatePrompt', args: [] }
+  };
+  const h = handlers[type];
+  if(!h) { btn.disabled=false; btn.innerHTML=old; lucide.createIcons(); return; }
+
+  if(type==='gen') {
+    const d=prompt('Describe the prompt you want to create:'); if(!d) {
+      btn.disabled=false; btn.innerHTML=old; lucide.createIcons(); return;
+    }
+    h.args = [d];
+  } else {
+    if(!raw) { alert('Write a prompt first.'); btn.disabled=false; btn.innerHTML=old; lucide.createIcons(); return; }
+  }
+
+  google.script.run.withSuccessHandler(res => {
+    btn.disabled=false; btn.innerHTML=old; lucide.createIcons();
+    if(!res) { toast('AI unavailable — try again'); return; }
+    if(type==='enhance') {
+      if(res.enhanced_prompt) $('edit-prompt').value = res.enhanced_prompt;
+      if(res.improvement_notes) {
+        const notes = Array.isArray(res.improvement_notes) ? res.improvement_notes.join('\n') : String(res.improvement_notes);
+        $('edit-notes').value = notes;
+      }
+      toast('Prompt enhanced');
+    } else if(type==='tag') {
+      if(res.suggested_category) { $('edit-cat').value = res.suggested_category; onCatChange(); }
+      if(res.suggested_tags) $('edit-tags').value = res.suggested_tags;
+      toast('Auto-tagged');
+    } else if(type==='gen') {
+      if(res.prompt) $('edit-prompt').value = res.prompt;
+      if(res.suggested_tags) $('edit-tags').value = res.suggested_tags;
+      toast('Prompt generated');
+    }
+  })[h.fn].apply(null, h.args);
+}
+
+// ── CATEGORIES ───────────────────────────────────────────────────────────
+function renderCats(){
+  const el=$('cat-list'); el.innerHTML='';
+  S.cats.forEach(cat=>{
+    const cnt=S.prompts.filter(p=>p.cat===cat.name).length;
+    el.innerHTML+=`
+      <div class="cat-card">
+        <div class="cat-card-head">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:16px;height:16px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.05rem">${cat.name}</span>
+            <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;padding:2px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--muted-fg)">${cnt} prompt${cnt!==1?'s':''}</span>
+          </div>
+          <button class="btn btn-ghost btn-sm text-destructive" onclick="delCat('${e(cat.name)}')" style="color:var(--destructive)"><i data-lucide="trash-2"></i></button>
+        </div>
+        <div class="cat-card-body">
+          <div class="section-micro">Subcategories</div>
+          <div style="margin-bottom:14px">
+            ${cat.subs.map(s=>`<span class="subcat-chip">${s}<button onclick="delSub('${e(cat.name)}','${e(s)}')"><i data-lucide="x" style="width:12px;height:12px"></i></button></span>`).join('')}
+            ${cat.subs.length===0?`<span style="font-size:0.875rem;color:var(--muted-fg);font-style:italic">No subcategories yet.</span>`:''}
+          </div>
+          <div style="display:flex;gap:8px;max-width:360px">
+            <input type="text" class="input" id="addsub-${cid(cat.name)}" style="height:34px;font-size:0.85rem" placeholder="New subcategory...">
+            <button class="btn btn-secondary btn-sm" onclick="addSub('${e(cat.name)}')"><i data-lucide="plus"></i> Add</button>
+          </div>
+        </div>
+      </div>`;
+  });
+  lucide.createIcons();
+}
+function addCat(){
+  const n=$('new-cat-name').value.trim(), col=$('new-cat-color').value;
+  if(!n) return;
+  if(S.cats.find(c=>c.name.toLowerCase()===n.toLowerCase())) { toast('Category already exists'); return; }
+  S.cats.push({name:n,color:col,subs:[]}); $('new-cat-name').value='';
+  renderCats(); renderSidebar(); toast('Saving category...');
+  google.script.run
+    .withSuccessHandler(()=>{ toast('Category saved!'); })
+    .withFailureHandler(err=>{ toast('Error saving category: '+(err&&err.message||'unknown')); init(); })
+    .saveCategories(S.cats.map(c=>({name:c.name, color:c.color, subcategories:c.subs})));
+}
+function delCat(name){
+  const cnt = S.prompts.filter(p => p.cat === name).length;
+  const doDelete = (action) => {
+    S.cats = S.cats.filter(c => c.name !== name);
+    S.prompts = S.prompts.filter(p => p.cat !== name);
+    renderCats(); renderSidebar(); renderLibrary();
+    toast(action === 'archive' ? 'Archiving & deleting category...' : 'Deleting category...');
+    google.script.run
+      .withSuccessHandler(result => {
+        const msg = action === 'archive'
+          ? `Category deleted. ${result.archivedCount||0} prompt(s) in Archive.`
+          : 'Category and all prompts permanently deleted.';
+        toast(msg);
+        if ($('page-categories').classList.contains('active')) renderArchive();
+      })
+      .withFailureHandler(err => {
+        toast('Error: ' + (err && err.message || 'Could not delete category'));
+        init();
+      })
+      .deleteCategory(name, action);
+  };
+  if (cnt > 0) {
+    // First ask: delete or cancel
+    confirmAction(`Delete category "${name}"? It has ${cnt} prompt${cnt!==1?'s':''}.`, () => {
+      // Then ask: archive or delete prompts
+      choiceModal(
+        `What should happen to the ${cnt} prompt${cnt!==1?'s':''} in "${name}"?`,
+        '\u21a9 Archive (reassign later)',
+        '\uD83D\uDDD1 Delete permanently',
+        () => doDelete('archive'),
+        () => doDelete('delete')
+      );
+    });
+  } else {
+    confirmAction(`Delete empty category "${name}"?`, () => doDelete('delete'));
+  }
+}
+function addSub(cat){
+  const el=$('addsub-'+cid(cat)); const val=el.value.trim(); if(!val) return;
+  const c=S.cats.find(x=>x.name===cat);
+  if(c.subs.includes(val)) { toast('Subcategory already exists'); return; }
+  c.subs.push(val); el.value=''; renderCats(); renderSidebar();
+  google.script.run
+    .withSuccessHandler(()=>{})
+    .withFailureHandler(err=>{ toast('Error saving subcategory: '+(err&&err.message||'unknown')); init(); })
+    .saveCategories(S.cats.map(cd=>({name:cd.name, color:cd.color, subcategories:cd.subs})));
+}
+function delSub(cat,sub){
+  const c=S.cats.find(x=>x.name===cat); c.subs=c.subs.filter(s=>s!==sub);
+  renderCats(); renderSidebar();
+  google.script.run
+    .withSuccessHandler(()=>{})
+    .withFailureHandler(err=>{ toast('Error: '+(err&&err.message||'unknown')); init(); })
+    .saveCategories(S.cats.map(cd=>({name:cd.name, color:cd.color, subcategories:cd.subs})));
+}
+
+// ── ARCHIVE ───────────────────────────────────────────────────────────────
+function renderArchive() {
+  const el = $('archive-list');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--muted-fg);font-size:0.85rem">Loading archive...</div>';
+  google.script.run
+    .withSuccessHandler(items => {
+      if (!items || !items.length) {
+        el.innerHTML = '<div style="color:var(--muted-fg);font-size:0.875rem;font-style:italic">No archived prompts.</div>';
+        return;
+      }
+      el.innerHTML = items.map(p => `
+        <div class="cat-card" style="margin-bottom:12px">
+          <div class="cat-card-head">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font-weight:700">${p.Title||'(untitled)'}</span>
+              <span style="font-size:0.75rem;color:var(--muted-fg)">From: <strong>${p.OriginalCategory||'?'}</strong> · Archived: ${(p.ArchivedAt||'').slice(0,10)}</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button class="btn btn-secondary btn-sm" onclick="restoreArchived('${e(String(p.PromptID))}')">↩ Restore</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--destructive)" onclick="deleteArchived('${e(String(p.PromptID))}')"><i data-lucide="trash-2"></i></button>
+            </div>
+          </div>
+        </div>`).join('');
+      lucide.createIcons();
+    })
+    .withFailureHandler(()=>{ el.innerHTML = '<div style="color:var(--destructive)">Could not load archive.</div>'; })
+    .getArchivedPrompts();
+}
+function restoreArchived(promptId) {
+  const cats = S.cats.map(c=>c.name);
+  if (!cats.length) { toast('No categories available'); return; }
+  // Build a modal with radio-style buttons for each category
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `<div style="background:var(--bg);border:2px solid var(--border);padding:28px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto">
+    <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;text-transform:uppercase;margin-bottom:16px">Restore to which category?</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      ${cats.map(c=>`<button class="btn btn-secondary _cat-pick" data-cat="${e(c)}" style="text-align:left;justify-content:flex-start">${c}</button>`).join('')}
+    </div>
+    <button class="btn btn-ghost" id="_mr" style="width:100%">Cancel</button></div>`;
+  document.body.appendChild(modal);
+  const done = () => document.body.removeChild(modal);
+  modal.querySelector('#_mr').onclick = done;
+  modal.onclick = ev => { if(ev.target===modal) done(); };
+  modal.querySelectorAll('._cat-pick').forEach(btn => {
+    btn.onclick = () => {
+      const target = btn.dataset.cat;
+      done();
+      toast('Restoring...');
+      google.script.run
+        .withSuccessHandler(() => { toast('Restored! Reloading...'); setTimeout(()=>init(),1500); })
+        .withFailureHandler(err=>{ toast('Error: '+(err&&err.message||'unknown')); })
+        .restoreArchivedPrompt(promptId, target);
+    };
+  });
+}
+function deleteArchived(promptId) {
+  confirmAction('Permanently delete this archived prompt?', () => {
+    google.script.run
+      .withSuccessHandler(() => { toast('Deleted from archive'); renderArchive(); })
+      .withFailureHandler(err=>{ toast('Error: '+(err&&err.message||'unknown')); })
+      .deleteArchivedPrompt(promptId);
+  });
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────────────
+window.onload = init;
+</script>

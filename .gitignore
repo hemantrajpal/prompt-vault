@@ -1,0 +1,48 @@
+# .gitignore for Prompt Vault
+
+# ── Environment & Secrets ──────────────────────────────────────────────────
+# NEVER commit API keys, credentials, or personal config
+.env
+.env.*
+secrets.json
+credentials.json
+
+# ── Working copies (local GAS sync folders — use src/ for the published version) ──
+10_Prompt_app/
+prompt-app/
+
+# ── macOS ──────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+ehthumbs.db
+Thumbs.db
+
+# ── IDE & Editor ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Internal AI tooling (Antigravity-specific) ─────────────────────────────
+.claude/
+.gemini/
+.anthropic/
+
+# ── Logs & temp files ─────────────────────────────────────────────────────
+*.log
+tmp/
+temp/
+
+# ── Python scripts (local utility only, not part of the app) ──────────────
+sync_styles.py
+*.pyc
+__pycache__/
+
+# ── Node (if ever added) ──────────────────────────────────────────────────
+node_modules/
+package-lock.json
