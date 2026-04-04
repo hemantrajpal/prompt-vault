@@ -59,8 +59,6 @@ Instead of losing prompts in chat histories or scattered notes, Prompt Vault giv
 ![SEO Filter](screenshots/06-library-seo-filter.png)
 *Filter library by category — SEO prompts shown here*
 
-> All screenshots are generated automatically from `Preview.html` — see `screenshots.mjs`.
-
 ---
 
 ## 🎬 Intro Video
