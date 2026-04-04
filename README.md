@@ -8,6 +8,10 @@
 
 ---
 
+![Prompt Vault — Intro Banner](prompt-vault-banner.png)
+
+---
+
 ## What is Prompt Vault?
 
 **Prompt Vault** is a team prompt library that helps AI power users store, organise, and reuse their best prompts across tools like ChatGPT, Claude, Gemini, Midjourney, and more.
@@ -37,7 +41,34 @@ Instead of losing prompts in chat histories or scattered notes, Prompt Vault giv
 
 ## 📸 Screenshots
 
-> *Add your own screenshots here once deployed.*
+![Library View](screenshots/01-library-view.png)
+*Your prompt library — filter by category, search by keyword*
+
+![Prompt Detail](screenshots/02-prompt-detail.png)
+*View a prompt with variables ready to fill and copy*
+
+![Add New Prompt](screenshots/04-editor-filled.png)
+*Create a new prompt with title, category, tags and `{{variable}}` placeholders*
+
+![Vault AI](screenshots/03-editor-new.png)
+*AI-powered enhancements right inside the editor*
+
+![Category Manager](screenshots/05-categories.png)
+*Organise prompts into colour-coded categories and subcategories*
+
+![SEO Filter](screenshots/06-library-seo-filter.png)
+*Filter library by category — SEO prompts shown here*
+
+> All screenshots are generated automatically from `Preview.html` — see `screenshots.mjs`.
+
+---
+
+## 🎬 Intro Video
+
+![Prompt Vault Intro](prompt-vault-intro.gif)
+*26-second walkthrough: library, add prompts, manage categories*
+
+**Full HD version:** [prompt-vault-intro.mp4](prompt-vault-intro.mp4)
 
 ---
 

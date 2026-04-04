@@ -43,6 +43,13 @@ sync_styles.py
 *.pyc
 __pycache__/
 
-# ── Node (if ever added) ──────────────────────────────────────────────────
+# ── Node & Build ─────────────────────────────────────────────────────────
 node_modules/
 package-lock.json
+package.json
+
+# ── Excluded assets ───────────────────────────────────────────────────────
+video/
+Preview.html
+screenshots.mjs
+header/
