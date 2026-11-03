@@ -1,0 +1,24 @@
+<script>
+function assemblePrompt(template,variables,values) {
+  const definitions=new Map((variables||[]).map(v=>[v.key,v])),missingKeys=[],invalidKeys=[];
+  const text=String(template||'').replace(/{{([\s\S]*?)}}/g,(token,key)=>{
+    const v=definitions.get(key);
+    if(!/^[a-z][a-z0-9_]{0,31}$/.test(key)||!v){invalidKeys.push(key);return token;}
+    const raw=Object.prototype.hasOwnProperty.call(values||{},key)?String(values[key]):'';
+    if(v.required&&!raw.trim()){missingKeys.push(key);return token;}
+    return raw || (v.required?'':String(v.defaultValue||''));
+  });
+  if(String(template||'').replace(/{{[\s\S]*?}}/g,'').match(/{{|}}/))invalidKeys.push('unclosed token');
+  return {text,missingKeys:[...new Set(missingKeys)],invalidKeys:[...new Set(invalidKeys)]};
+}
+function createSaveIntent(draft,baseRevision,previous) {
+  const fingerprint=JSON.stringify({draft,baseRevision});
+  if(previous&&previous.fingerprint===fingerprint)return previous;
+  return {operationId:crypto.randomUUID(),expectedRevision:baseRevision,record:JSON.parse(JSON.stringify(draft)),fingerprint};
+}
+function filterPrompts(records,query,categoryId,archived,categories) {
+  const q=String(query||'').toLowerCase();return records.filter(p=>
+    (archived?p.status==='archived':p.status!=='archived')&&(!categoryId||p.categoryId===categoryId)&&
+    (!q||[p.title,p.body,(p.tags||[]).join(' '),p.subcategory,p.workflow?.job,(categories.find(c=>c.id===p.categoryId)||{}).name].join(' ').toLowerCase().includes(q)));
+}
+</script>

@@ -45,11 +45,19 @@ __pycache__/
 
 # ── Node & Build ─────────────────────────────────────────────────────────
 node_modules/
-package-lock.json
-package.json
 
 # ── Excluded assets ───────────────────────────────────────────────────────
 video/
 Preview.html
 screenshots.mjs
 header/
+
+# Owner Edition local evidence
+.superpowers/
+artifacts/
+/node_modules
+
+# Local Google connection metadata and credentials
+.clasp.json
+.clasprc.json
+.clasprc.*.json

@@ -1,0 +1,7 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync,existsSync} from 'node:fs';
+function core(){const g=vm.createContext({crypto:{randomUUID:()=> 'op-1'}});if(existsSync('src/_Core.html'))vm.runInContext(readFileSync('src/_Core.html','utf8').replace(/<\/?script>/g,''),g);return g;}
+const vars=[{key:'name',label:'Name',type:'text',required:true,example:'Ada'}];
+test('hints never satisfy required inputs',()=>{const g=core();assert.equal(typeof g.assemblePrompt,'function');assert.equal(g.assemblePrompt('Hello {{name}}',vars,{}).missingKeys.join(','),'name');});
+test('token values are inserted literally once, including replacement symbols and new tokens',()=>{const g=core();assert.equal(g.assemblePrompt('{{name}} / {{name}}',vars,{name:'$& $1 {{other}}'}).text,'$& $1 {{other}} / $& $1 {{other}}');});
+test('malformed/undeclared tokens block copy and optional defaults are explicit',()=>{const g=core();assert.equal(g.assemblePrompt('{{bad-key}}',[],{}).invalidKeys.length,1);assert.equal(g.assemblePrompt('{{tone}}',[{key:'tone',required:false,example:'hint',defaultValue:'plain'}],{}).text,'plain');});
+test('save intent retains unchanged operation identity but uses new identity when draft changes',()=>{const g=core();let n=0;g.crypto.randomUUID=()=> 'op-'+(++n);const first=g.createSaveIntent({title:'A'},1);assert.equal(g.createSaveIntent({title:'A'},1,first).operationId,'op-1');assert.equal(g.createSaveIntent({title:'B'},1,first).operationId,'op-2');});

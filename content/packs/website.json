@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 2,
+  "id": "website",
+  "version": "0.1.0",
+  "workflows": [
+    {
+      "title": "Outline website content",
+      "body": "Create a page-by-page content outline from approved brief {{brief}}.\nAudience: {{audience}}.\nPage goal: {{page_goal}}.\nReturn page sections, the fact each section needs, and unanswered questions. Use supplied facts only; do not invent proof, pages or features.",
+      "tags": [
+        "website",
+        "delivery"
+      ],
+      "variables": [
+        {
+          "key": "brief",
+          "label": "Brief",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "audience",
+          "label": "Audience",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "page_goal",
+          "label": "Page goal",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        }
+      ],
+      "notes": "Draft candidate. Requires human review on three realistic briefs before approval.",
+      "negativePrompt": "",
+      "model": "",
+      "workflow": {
+        "packId": "website",
+        "contentVersion": "0.1.0",
+        "job": "Outline website content",
+        "requiredContext": "brief, audience, page_goal",
+        "example": "Synthetic example: a solo service business with an approved brief; all names and claims are illustrative.",
+        "expectedOutput": "A prioritized page/section outline with evidence needs and unanswered questions.",
+        "reviewChecklist": [
+          "Trace every factual claim to the supplied brief.",
+          "Leave missing facts as questions.",
+          "Review all output before external use."
+        ],
+        "limits": [
+          "Untested draft; model output may contain errors.",
+          "No browsing, execution or publishing is performed by this library."
+        ],
+        "reviewStatus": "draft",
+        "contentOwner": "Studio owner",
+        "lastTested": null
+      }
+    },
+    {
+      "title": "Draft a service page",
+      "body": "Draft a service page from approved offer facts:\n{{offer_facts}}\nAudience: {{audience}}.\nVoice: {{voice}}.\nReturn headline options, short section drafts, a factual CTA and a list of missing evidence. Never invent pricing, testimonials, guarantees or results.",
+      "tags": [
+        "website",
+        "delivery"
+      ],
+      "variables": [
+        {
+          "key": "offer_facts",
+          "label": "Offer facts",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "audience",
+          "label": "Audience",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "voice",
+          "label": "Voice",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        }
+      ],
+      "notes": "Draft candidate. Requires human review on three realistic briefs before approval.",
+      "negativePrompt": "",
+      "model": "",
+      "workflow": {
+        "packId": "website",
+        "contentVersion": "0.1.0",
+        "job": "Draft a service page",
+        "requiredContext": "offer_facts, audience, voice",
+        "example": "Synthetic example: a solo service business with an approved brief; all names and claims are illustrative.",
+        "expectedOutput": "A reviewable service-page draft and a list of missing facts.",
+        "reviewChecklist": [
+          "Trace every factual claim to the supplied brief.",
+          "Leave missing facts as questions.",
+          "Review all output before external use."
+        ],
+        "limits": [
+          "Untested draft; model output may contain errors.",
+          "No browsing, execution or publishing is performed by this library."
+        ],
+        "reviewStatus": "draft",
+        "contentOwner": "Studio owner",
+        "lastTested": null
+      }
+    },
+    {
+      "title": "Review supplied website content",
+      "body": "Review only this supplied page content:\n{{page_content}}\nPage goal: {{page_goal}}.\nAudience: {{audience}}.\nCheck clarity, hierarchy, task completion, factual support and CTA consistency. Quote the relevant supplied line for each issue. Do not claim to have visited URLs or tested interactions. Return prioritized findings and proposed revisions; keep uncertainty explicit.",
+      "tags": [
+        "website",
+        "delivery"
+      ],
+      "variables": [
+        {
+          "key": "page_content",
+          "label": "Page content",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "page_goal",
+          "label": "Page goal",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "audience",
+          "label": "Audience",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        }
+      ],
+      "notes": "Draft candidate. Requires human review on three realistic briefs before approval.",
+      "negativePrompt": "",
+      "model": "",
+      "workflow": {
+        "packId": "website",
+        "contentVersion": "0.1.0",
+        "job": "Review supplied website content",
+        "requiredContext": "page_content, page_goal, audience",
+        "example": "Synthetic example: a solo service business with an approved brief; all names and claims are illustrative.",
+        "expectedOutput": "Prioritized content findings tied to supplied lines, with proposed improvements.",
+        "reviewChecklist": [
+          "Trace every factual claim to the supplied brief.",
+          "Leave missing facts as questions.",
+          "Review all output before external use."
+        ],
+        "limits": [
+          "Untested draft; model output may contain errors.",
+          "No browsing, execution or publishing is performed by this library."
+        ],
+        "reviewStatus": "draft",
+        "contentOwner": "Studio owner",
+        "lastTested": null
+      }
+    },
+    {
+      "title": "Prepare UAT and launch checks",
+      "body": "Create a UAT and launch checklist for this agreed delivery scope:\n{{scope}}\nPages/routes: {{routes}}.\nKnown constraints: {{constraints}}.\nSeparate checks, expected results, responsible reviewer and evidence to collect. Mark anything requiring live access as not tested. Do not invent functionality, security results or deployment success.",
+      "tags": [
+        "website",
+        "delivery"
+      ],
+      "variables": [
+        {
+          "key": "scope",
+          "label": "Scope",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "routes",
+          "label": "Routes",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        },
+        {
+          "key": "constraints",
+          "label": "Constraints",
+          "type": "multiline",
+          "required": true,
+          "example": "Use approved, permitted facts only."
+        }
+      ],
+      "notes": "Draft candidate. Requires human review on three realistic briefs before approval.",
+      "negativePrompt": "",
+      "model": "",
+      "workflow": {
+        "packId": "website",
+        "contentVersion": "0.1.0",
+        "job": "Prepare UAT and launch checks",
+        "requiredContext": "scope, routes, constraints",
+        "example": "Synthetic example: a solo service business with an approved brief; all names and claims are illustrative.",
+        "expectedOutput": "A scoped checklist with steps, expected results, owners and evidence fields.",
+        "reviewChecklist": [
+          "Trace every factual claim to the supplied brief.",
+          "Leave missing facts as questions.",
+          "Review all output before external use."
+        ],
+        "limits": [
+          "Untested draft; model output may contain errors.",
+          "No browsing, execution or publishing is performed by this library."
+        ],
+        "reviewStatus": "draft",
+        "contentOwner": "Studio owner",
+        "lastTested": null
+      }
+    }
+  ]
+}

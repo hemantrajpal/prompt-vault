@@ -1,220 +1,42 @@
-# Prompt Vault 🗄️
+# Prompt Vault · Owner Edition candidate
 
-> A beautiful, multi-user AI prompt library built entirely on Google Apps Script, Google Sheets, and Google Drive — no servers, no hosting fees, no databases.
+A personal prompt/workflow library on Google Apps Script and Google Sheets. Keep reusable templates, fill structured inputs, review assembled text, and copy into your chosen AI tool.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform: Google Apps Script](https://img.shields.io/badge/Platform-Google%20Apps%20Script-4285F4?logo=google)](https://script.google.com)
-[![Made with: Vanilla JS](https://img.shields.io/badge/Made%20with-Vanilla%20JS-F7DF1E?logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+This branch implements the owner core and UI locally. **Live Google integration, clone migration/restore and release acceptance are pending.** It is not a verified production release. The original source copy remains in `Prompt_app/` for provenance; maintain `src/` only.
 
----
+## Try the local demo
 
-![Prompt Vault — Intro Banner](prompt-vault-header.png)
-
----
-
-## What is Prompt Vault?
-
-**Prompt Vault** is a team prompt library that helps AI power users store, organise, and reuse their best prompts across tools like ChatGPT, Claude, Gemini, Midjourney, and more.
-
-Instead of losing prompts in chat histories or scattered notes, Prompt Vault gives your team a single, searchable, categorised library — with role-based access, image attachments, variable substitution, and AI-assisted prompt enhancement.
-
-**The entire backend runs on your existing Google Workspace.** Your data lives in a Google Spreadsheet you own. No monthly SaaS fee. No vendor lock-in.
-
----
-
-## ✨ Features
-
-| Feature | Description |
-|---------|-------------|
-| 📁 **Category System** | Organise prompts into categories with colour codes and subcategories |
-| 🔍 **Full-text Search** | Filter prompts by title, tags, body, or category in real time |
-| 🖼️ **Image Attachments** | Attach reference images (vision prompts, style references) via Google Drive |
-| 🔡 **Variable Substitution** | Use `{{variable}}` syntax — fill & copy with one tap |
-| 🤖 **AI Assist** | Enhance, auto-tag, or generate prompts using Claude / Gemini |
-| 🗂️ **Archive System** | Deleted category prompts are safely archived & restoreable |
-| 👥 **Multi-user Auth** | Whitelist emails via Script Properties — each user sees only their prompts |
-| 🌙 **Dark / Light Mode** | Brutalist-inspired UI with full theme switching |
-| 📱 **Mobile Friendly** | Responsive layout, custom modals (no native `confirm()` dialogs) |
-| 🆓 **Zero Cost** | Runs on Google Apps Script — free for all Google accounts |
-
----
-
-## 📸 Screenshots
-
-![Library View](screenshots/01-library-view.png)
-*Your prompt library — filter by category, search by keyword*
-
-![Prompt Detail](screenshots/02-prompt-detail.png)
-*View a prompt with variables ready to fill and copy*
-
-![Add New Prompt](screenshots/04-editor-filled.png)
-*Create a new prompt with title, category, tags and `{{variable}}` placeholders*
-
-![Vault AI](screenshots/03-editor-new.png)
-*AI-powered enhancements right inside the editor*
-
-![Category Manager](screenshots/05-categories.png)
-*Organise prompts into colour-coded categories and subcategories*
-
-![SEO Filter](screenshots/06-library-seo-filter.png)
-*Filter library by category — SEO prompts shown here*
-
----
-
-## 🎬 Intro Video
-
-![Prompt Vault Intro](prompt-vault-intro.gif)
-*26-second walkthrough: library, add prompts, manage categories*
-
-**Full HD version:** [prompt-vault-intro.mp4](prompt-vault-intro.mp4)
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Runtime** | Google Apps Script (V8) |
-| **Database** | Google Sheets (one tab per category) |
-| **File Storage** | Google Drive |
-| **Frontend** | HTML5 + Vanilla JS + Vanilla CSS |
-| **Icons** | [Lucide Icons](https://lucide.dev) (CDN) |
-| **Fonts** | Google Fonts — Inter + Space Grotesk |
-| **AI** | Anthropic Claude API (configurable) |
-
----
-
-## 🚀 Setup Guide
-
-### Prerequisites
-
-- A Google account (free)
-- A Google Spreadsheet (create a new blank one)
-- *(Optional)* An Anthropic API key for AI features
-
-### Step 1 — Create the Apps Script Project
-
-1. Go to [script.google.com](https://script.google.com) → **New Project**
-2. Rename the project to `Prompt Vault`
-
-### Step 2 — Copy the Source Files
-
-Copy each file from the `src/` folder into your Apps Script project:
-
-| File | Type | Purpose |
-|------|------|---------|
-| `Code.gs` | Script | Entry point, auth, config reader |
-| `Sheets.gs` | Script | All CRUD operations on Google Sheets |
-| `Drive.gs` | Script | Image upload to Google Drive |
-| `AI.gs` | Script | Claude AI integration |
-| `Setup.gs` | Script | One-time spreadsheet setup |
-| `Index.html` | HTML | App shell / layout |
-| `_Styles.html` | HTML | All CSS styles |
-| `_Scripts.html` | HTML | All frontend JavaScript |
-
-> In the Apps Script editor: use **File → New → Script file** for `.gs` files and **File → New → HTML file** for `.html` files.
-
-### Step 3 — Configure Script Properties
-
-In the Apps Script editor: **Project Settings → Script Properties → Add property**
-
-| Property | Value | Required |
-|----------|-------|----------|
-| `SPREADSHEET_ID` | Your Google Sheet ID (from the URL) | ✅ |
-| `ALLOWED_EMAILS` | Comma-separated list of allowed emails | Optional |
-| `ANTHROPIC_API_KEY` | Your Claude API key | Optional |
-| `DRIVE_FOLDER_ID` | Google Drive folder ID for image uploads | Optional |
-
-**Finding your Spreadsheet ID:**
-The ID is the long string in your sheet URL:
-```
-https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit
+```sh
+npm ci
+npm run demo
 ```
 
-### Step 4 — Run Initial Setup
+Open [the local demo](http://127.0.0.1:4322/). It renders the canonical application and executes the actual backend against in-memory Google service doubles. Synthetic data and changes stay in the local process; restarting clears them. It makes no Google/AI/Drive calls. Fonts may load from Google Fonts, with system fallbacks.
 
-In the Apps Script editor:
-1. Select the `setupPromptVault` function from the dropdown
-2. Click **Run** — this creates the required sheets and schema
+## Verify locally
 
-### Step 5 — Deploy as Web App
-
-1. Click **Deploy → New Deployment**
-2. Select type: **Web App**
-3. Set **Execute as**: Me
-4. Set **Who has access**: Anyone with Google Account *(or "Only myself" for private use)*
-5. Click **Deploy** → **Authorise**
-6. Copy the **Web App URL** — this is your app link!
-
----
-
-## 📂 Project Structure
-
-```
-prompt-vault/
-├── src/
-│   ├── Code.gs          # Web app entry point & auth
-│   ├── Sheets.gs        # CRUD: prompts, categories, archive
-│   ├── Drive.gs         # Image upload & URL generation
-│   ├── AI.gs            # AI prompt enhancement via Claude
-│   ├── Setup.gs         # One-time spreadsheet initialisation
-│   ├── Index.html       # App HTML shell
-│   ├── _Styles.html     # CSS design system
-│   └── _Scripts.html    # Frontend JS (SPA logic)
-├── README.md
-├── LICENSE
-├── CONTRIBUTING.md
-└── .gitignore
+```sh
+npm test
 ```
 
----
+Node 22 was used during implementation. Browser tests use Playwright and installed Google Chrome (`channel: chrome`). Install Chrome to run those tests; no Google account is needed for local verification. Backend tests include interrupted writes, lost responses, stale revisions, access denial and staged-import visibility.
 
-## 🗄️ Data Architecture
+## Candidate capabilities
 
-Prompt Vault uses a **Google Sheet as a relational database**:
+- Owner verification on server actions; safe text rendering.
+- Prompt/category editing, notes/negative prompt, literal variables and preview.
+- Committed save state, retained failed drafts and conflict review.
+- Archive/restore/history with preserved metadata.
+- Versioned current-head JSON export/import and paged history/quarantine exports.
+- Dark/light styling preserving the original charcoal/amber direction; mobile search and keyboard controls.
+- Four website workflow candidates, explicitly draft and awaiting quality review.
 
-| Sheet Tab | Purpose |
-|-----------|---------|
-| `Config` | Category definitions, colours, subcategories, app settings |
-| `_Index` | Fast lookup index of all prompts across categories |
-| `_Archive` | Soft-deleted prompts from removed categories |
-| `[CategoryName]` | One sheet per category containing full prompt data |
+AI assistance and image uploads are disabled. JSON exports contain attachment references, not media bytes. Team sharing, roles, public prompts, paid SaaS and autonomous publishing are outside this edition.
 
-Each prompt stores: `PromptID`, `Title`, `Subcategory`, `Tags`, `Prompt`, `Variables` (JSON), `Model`, `ImageURL`, `ImprovementNotes`, `CreatedBy`, `CreatedAt`, `ModifiedAt`.
+## Installation and remaining gates
 
----
+Read [INSTALL.md](docs/owner-edition/INSTALL.md), [LIVE-ACCEPTANCE.md](docs/owner-edition/LIVE-ACCEPTANCE.md) and [execution status](docs/owner-edition/EXECUTION.md). Work on a disposable installation first; setup creates v2 tables without clearing legacy data. No production migration/cutover is implied.
 
-## 🔐 Security & Multi-User
+The [implementation roadmap](docs/superpowers/plans/2026-11-04-prompt-vault-roadmap.md) remains the full scope. Historical preview/screenshots/media illustrate the earlier interface and do not prove authorization/persistence. Media build dependencies and asset provenance require separate release review.
 
-- Emails are validated server-side in `Code.gs` using `Session.getActiveUser().getEmail()`
-- Prompts are filtered per-user — users only see their own prompts
-- The app is deployed "Execute as: Me" so your Sheets credentials are never exposed
-
-> **Note:** For a team deployment, add all team email addresses to the `ALLOWED_EMAILS` Script Property.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-**Ideas for contributions:**
-- 🔔 Export to Markdown / JSON
-- 🏷️ Bulk tag editor
-- 📊 Usage analytics dashboard
-- 🔗 Public prompt sharing links
-- 🌐 Support for OpenAI / Gemini in AI Assist
-
----
-
-## 📄 License
-
-MIT © [Your Name] — see [LICENSE](LICENSE) for details.
-
----
-
-## 🙏 Acknowledgements
-
-- [Lucide Icons](https://lucide.dev) for beautiful open-source icons
-- [Google Apps Script](https://developers.google.com/apps-script) for making serverless apps accessible to everyone
-- [Anthropic](https://anthropic.com) for the Claude API powering AI Assist
+MIT © 2026 Hemant. See [LICENSE](LICENSE). External fonts/icons/assets retain their own licenses; review distribution provenance before publishing.

@@ -1,0 +1,14 @@
+<script>
+const vaultApi={
+  async call(method,payload){
+    let result;
+    if(typeof window.vaultTransport==='function')result=await window.vaultTransport(method,payload);
+    else result=await new Promise((resolve,reject)=>{
+      if(!window.google?.script?.run){reject(new Error('Open this app through its owner Apps Script deployment.'));return;}
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(()=>reject(new Error('The connection failed. Your draft is still here.')))[method](payload);
+    });
+    if(!result?.ok){const e=new Error(result?.error?.message||'The action could not be completed.');Object.assign(e,result?.error||{});throw e;}
+    return result.data;
+  }
+};
+</script>

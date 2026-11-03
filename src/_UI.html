@@ -1,0 +1,37 @@
+<script>
+function uiText(tag,text,attributes={}) {
+  const node=document.createElement(tag);if(text!==null&&text!==undefined)node.textContent=String(text);
+  for(const [key,value] of Object.entries(attributes)){
+    if(key==='className')node.className=value;
+    else if(['id','role','type','aria-label','aria-live','tabindex','for'].includes(key))node.setAttribute(key,value);
+  }
+  return node;
+}
+function action(label,handler,kind='secondary',iconName) {
+  const b=uiText('button',null,{className:'btn btn-'+kind,type:'button','aria-label':label});
+  const names={'New prompt':'add','Create prompt':'add','Use':'arrow-right','Edit':'edit-2','Edit template':'edit-2','Copy assembled prompt':'copy','Archive':'archive','Restore':'export-1','Version history':'clock','Save prompt':'tick-circle','Download draft':'export-1','Close':'close-circle','Cancel':'close-circle','Export current prompts & categories':'export-1','Export full history':'clock','Export quarantine':'archive','Resume import':'import-1'};
+  const key=iconName===false?null:(iconName||names[label]);if(key)b.append(iconsax(key));b.append(uiText('span',label,{className:'button-label'}));b.addEventListener('click',handler);return b;
+}
+function field(label,value,{type='text',multiline=false,onInput,required=false}={}) {
+  const wrap=uiText('div',null,{className:'field-group'}),id='field-'+crypto.randomUUID();
+  const l=uiText('label',label+(required?' · required':''),{className:'field-label',for:id});
+  const input=uiText(multiline?'textarea':'input',null,{className:'input',id});
+  if(!multiline)input.type=type;else input.rows=6;
+  input.value=value||'';input.required=required;
+  if(onInput)input.addEventListener('input',()=>onInput(input.value));wrap.append(l,input);return {wrap,input};
+}
+function announce(message,kind='status') {
+  const el=document.getElementById('status');el.textContent=message;el.setAttribute('role',kind==='error'?'alert':'status');el.dataset.kind=kind;
+}
+function openDialog({title,content,actions=[],returnFocus=document.activeElement}) {
+  const dialog=uiText('dialog',null,{className:'vault-dialog'}),heading=uiText('h2',title,{id:'dialog-'+crypto.randomUUID()});
+  dialog.setAttribute('aria-labelledby',heading.id);dialog.append(heading,content);
+  const close=()=>{dialog.close();dialog.remove();if(returnFocus?.isConnected)returnFocus.focus();};
+  const footer=uiText('div',null,{className:'actions'});for(const a of actions)footer.append(action(a.label,()=>{close();a.run?.();},a.kind||'secondary'));
+  footer.append(action('Close',close));dialog.append(footer);dialog.addEventListener('cancel',e=>{e.preventDefault();close();});dialog.addEventListener('close',()=>{dialog.remove();if(returnFocus?.isConnected)returnFocus.focus();});document.body.append(dialog);dialog.showModal();return dialog;
+}
+async function confirmAction(message){return new Promise(resolve=>{
+ let answered=false;const content=uiText('p',message);const d=openDialog({title:'Confirm change',content,actions:[{label:'Confirm',kind:'primary',run:()=>{answered=true;resolve(true);}}]});d.addEventListener('close',()=>{if(!answered)resolve(false);});
+});}
+function downloadJson(name,value){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+</script>
