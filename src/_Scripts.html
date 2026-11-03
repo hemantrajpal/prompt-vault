@@ -30,9 +30,15 @@ async function navigate(page,record){
  renderNav();renderCurrent();$('content-area').focus();
 }
 function renderCurrent(){
- const descriptions={library:'A useful starting point for your next task.',archive:'Keep your library focused. Restore a prompt whenever you need it.',use:'Fill your facts, check the preview, and make it yours.',editor:'Capture a repeatable process. Keep the inputs clear.',categories:'Give every prompt a place that makes sense.',settings:'Your installation, your records, your recovery options.'};
+ const descriptions={library:'Your best prompts, ready for the next task.',archive:'Keep your library focused. Restore a prompt whenever you need it.',use:'Fill your facts, check the preview, and make it yours.',editor:'Capture a repeatable process. Keep the inputs clear.',categories:'Give every prompt a place that makes sense.',settings:'Your installation, your records, your recovery options.'};
  $('page-description').textContent=descriptions[appState.page]||'';
- $('layout-controls').hidden=!['library','archive'].includes(appState.page);
+ const isLibrary=['library','archive'].includes(appState.page);
+ document.body.dataset.page=appState.page;
+ $('search-row').hidden=!isLibrary;
+ $('layout-controls').hidden=!isLibrary;
+ $('new-prompt').hidden=!isLibrary;
+ $('topbar-title').textContent=appState.page==='library'?(appState.committed.categories.find(c=>c.id===appState.categoryId)?.name||'All prompts'):$('topbar-title').textContent;
+ $('topbar').querySelector('.eyebrow').textContent=({library:'Your workspace',archive:'Your workspace',categories:'Organize',settings:'Preferences',editor:'Prompt studio',use:'Prompt studio'})[appState.page];
 
  if(appState.page==='editor')renderEditorView(appState.baseRecord);
  else if(appState.page==='use')renderUseView(appState.baseRecord);
@@ -55,50 +61,52 @@ function renderLibraryView({records,query='',filters={},status='ready'}){
  if(selected?.subcategories.length){const sub=uiText('select',null,{className:'input','aria-label':'Subcategory filter'});for(const name of ['',...selected.subcategories]){const o=uiText('option',name||'All subcategories');o.value=name;sub.append(o);}sub.value=appState.subcategory||'';sub.addEventListener('change',()=>{appState.subcategory=sub.value||null;renderCurrent();});filterBar.append(sub);}
  view.prepend(filterBar);
  $('result-count').textContent=list.length+' prompt'+(list.length===1?'':'s');
- if(filters.categoryId||query){const clear=action('Clear filters',()=>{appState.categoryId=null;appState.subcategory=null;$('search-input').value='';renderNav();renderCurrent();});view.prepend(clear);}
+ if(filters.categoryId||query){const clear=action('Clear filters',()=>{appState.categoryId=null;appState.subcategory=null;$('search-input').value='';renderNav();renderCurrent();});clear.classList.add('clear-filters');filterBar.append(clear);}
  if(!list.length){const empty=uiText('section',null,{className:'panel'});empty.append(uiText('h2',records.length?'No matching prompts':'Your vault starts here'),uiText('p',records.length?'Try another search or clear the filters.':'Create a prompt or import a reviewed workflow bundle.'),action('Create prompt',()=>navigate('editor'),'primary'));grid.append(empty);return;}
  const fragment=document.createDocumentFragment();
  for(const p of list){
-  const card=uiText('article',null,{className:'prompt-card'}),stripe=uiText('div',null,{className:'card-top-bar'}),c=categories.find(c=>c.id===p.categoryId);
-  stripe.style.background=c&&/^#[0-9a-f]{6}$/i.test(c.color)?c.color:'#f5a623';
-  const body=uiText('div',null,{className:'card-body'}),title=action(p.title,()=>navigate('use',p),'ghost',false);title.classList.add('card-title');
-  const heading=uiText('div',null,{className:'card-heading'}),symbol=uiText('span',null,{className:'document-symbol'});symbol.append(iconsax('document-text'));heading.append(symbol,title);
-  const meta=uiText('div',null,{className:'card-meta'});meta.append(iconsax('folder-open'),uiText('span',(c?.name||'Unassigned')+(p.subcategory?' / '+p.subcategory:'')));
-  const snippet=uiText('div',null,{className:'card-snippet'});const summary=p.workflow?.summary||(p.body||'').replace(/{{([a-z0-9_]+)}}/g,(_,key)=>key.replaceAll('_',' ')).replace(/\s+/g,' ').trim();snippet.append(uiText('p',summary,{className:'card-preview'}));body.append(heading,meta,snippet);
-  const details=uiText('div',null,{className:'prompt-facts'});details.append(uiText('span',(p.variables||[]).length+' input'+((p.variables||[]).length===1?'':'s')));if(p.model)details.append(uiText('span',p.model));if(p.workflow)details.append(uiText('span',p.workflow.reviewStatus==='approved'?'Reviewed':'Draft',{className:'workflow-status'}));body.append(details);
-  const tags=uiText('div',null,{className:'card-tags'});for(const tag of p.tags||[])tags.append(uiText('span',tag,{className:'tag-chip'}));const footer=uiText('div',null,{className:'card-footer'});footer.append(tags);
-  const actions=uiText('div',null,{className:'actions'});actions.append(action(p.status==='archived'?'Restore':'Use',()=>p.status==='archived'?restorePrompt(p):navigate('use',p),'primary'),action('Edit',()=>navigate('editor',p)));footer.append(actions);body.append(footer);card.append(stripe,body);card.addEventListener('click',event=>{if(!event.target.closest('button,a,input,select')&&!window.getSelection()?.toString())navigate('use',p);});fragment.append(card);
+  const c=categories.find(c=>c.id===p.categoryId),card=uiText('article',null,{className:'prompt-card','aria-label':p.title});
+  const body=uiText('div',null,{className:'card-body'}),top=uiText('div',null,{className:'card-topline'});
+  const meta=uiText('div',null,{className:'card-meta'}),mark=uiText('span',null,{className:'category-mark'});mark.append(iconsax('folder-open'));meta.append(mark,uiText('span',(c?.name||'Unassigned')+(p.subcategory?' / '+p.subcategory:'')));
+  const edit=action('Edit',()=>navigate('editor',p),'ghost','edit-2');edit.classList.add('icon-button','card-edit');edit.title='Edit '+p.title;top.append(meta,edit);
+  const heading=uiText('h3',null,{className:'card-heading'}),title=action(p.title,()=>navigate('use',p),'ghost',false);title.classList.add('card-title');heading.append(title);
+  const summary=p.workflow?.summary||(p.body||'').replace(/{{([a-z0-9_]+)}}/g,(_,key)=>key.replaceAll('_',' ')).replace(/\s+/g,' ').trim(),snippet=uiText('div',null,{className:'card-snippet'});snippet.append(uiText('p',summary,{className:'card-preview'}));
+  const footer=uiText('div',null,{className:'card-footer'}),facts=uiText('div',null,{className:'prompt-facts'});facts.append(iconsax('document-text'),uiText('span',(p.variables||[]).length+' input'+((p.variables||[]).length===1?'':'s')));if(p.workflow)facts.append(uiText('span',p.workflow.reviewStatus==='approved'?'Reviewed':'Draft',{className:'workflow-status'}));
+  const actions=uiText('div',null,{className:'actions'});actions.append(action(p.status==='archived'?'Restore':'Use',()=>p.status==='archived'?restorePrompt(p):navigate('use',p),'primary'));const listEdit=action('Edit',()=>navigate('editor',p),'ghost','edit-2');listEdit.classList.add('icon-button','card-list-edit');listEdit.title='Edit '+p.title;actions.append(listEdit);footer.append(facts,actions);
+  body.append(top,heading,snippet,footer);card.append(body);card.addEventListener('click',event=>{if(!event.target.closest('button,a,input,select')&&!window.getSelection()?.toString())navigate('use',p);});fragment.append(card);
  }grid.append(fragment);
 }
 function renderUseView(p){
  if(!p)return navigate('library');const main=uiText('section',null,{className:'panel'}),inputs=uiText('section',null,{className:'panel'}),layout=uiText('div',null,{className:'detail-grid'});
- main.append(uiText('h2',p.title),uiText('p',p.workflow?.job||'Fill your facts, review the assembled prompt, then copy it into your chosen AI tool.'));
+ main.classList.add('prompt-preview-panel');inputs.classList.add('prompt-input-panel');
+ const back=action('Back to prompts',()=>navigate('library'),'ghost','arrow-right');back.classList.add('back-link');main.append(back,uiText('h2',p.title),uiText('p',p.workflow?.summary||p.workflow?.job||'Fill your facts, review the assembled prompt, then copy it into your chosen AI tool.'));
  const preview=uiText('pre','',{className:'prompt-body'}),validation=uiText('p','',{className:'validation'}),copy=action('Copy assembled prompt',async()=>{
   const result=assemblePrompt(p.body,p.variables,appState.useInputs);if(result.missingKeys.length||result.invalidKeys.length)return;
   try{await navigator.clipboard.writeText(result.text);announce('Copied. Review the result in your AI tool.');}catch(_){announce('Copy failed. Select the assembled text and copy manually.','error');preview.tabIndex=0;preview.focus();}
  },'primary');
  const update=()=>{const r=assemblePrompt(p.body,p.variables,appState.useInputs);preview.textContent=r.text;copy.disabled=!!(r.missingKeys.length||r.invalidKeys.length);validation.textContent=r.invalidKeys.length?'Fix template variables before use.':r.missingKeys.length?'Complete: '+r.missingKeys.join(', '):'Ready to copy. Check the preview first.';};
- inputs.append(uiText('h3','Your inputs'));for(const v of p.variables||[]){const f=field(v.label,appState.useInputs[v.key],{multiline:v.type==='multiline',required:v.required,onInput:value=>{appState.useInputs[v.key]=value;update();}});f.input.placeholder=v.example||'';inputs.append(f.wrap);}
- inputs.append(validation,copy);main.append(uiText('h3','Assembled prompt'),preview);
+ inputs.append(uiText('span','1 · PERSONALIZE',{className:'section-kicker'}),uiText('h3','Your inputs'),uiText('p','Add the details for this task. The preview updates as you type.'));if(!(p.variables||[]).length)inputs.append(uiText('p','This prompt is ready to use without any inputs.'));for(const v of p.variables||[]){const f=field(v.label,appState.useInputs[v.key],{multiline:v.type==='multiline',required:v.required,onInput:value=>{appState.useInputs[v.key]=value;update();}});f.input.placeholder=v.example||'';if(v.type==='multiline')f.input.rows=3;inputs.append(f.wrap);}
+ inputs.append(validation);main.append(uiText('span','2 · REVIEW & COPY',{className:'section-kicker'}),uiText('h3','Prompt preview'),preview,copy);
  if(p.workflow){for(const [label,value] of [['Review checklist',p.workflow.reviewChecklist],['Known limits',p.workflow.limits]]){main.append(uiText('h3',label));for(const line of Array.isArray(value)?value:[value||'Not specified'])main.append(uiText('p',line));}}
- const controls=uiText('div',null,{className:'actions'});controls.append(action('Edit template',()=>navigate('editor',p)),action('Version history',()=>showHistory(p)),action('Archive',()=>archivePrompt(p)));main.append(controls);layout.append(main,inputs);$('view').replaceChildren(layout);update();
+ const controls=uiText('div',null,{className:'actions'});controls.append(action('Edit template',()=>navigate('editor',p)),action('Version history',()=>showHistory(p)),action('Archive',()=>archivePrompt(p)));main.append(controls);layout.append(inputs,main);$('view').replaceChildren(layout);update();
 }
 function renderEditorView(record){
  const p=appState.draft||JSON.parse(JSON.stringify(record||{title:'',body:'',categoryId:appState.categoryId||appState.committed.categories.find(c=>c.status==='active')?.id||'',subcategory:'',tags:[],variables:[],notes:'',negativePrompt:'',model:''}));appState.draft=p;
- const panel=uiText('form',null,{className:'panel editor-form'});panel.addEventListener('submit',e=>{e.preventDefault();saveDraft();});panel.append(uiText('h2',record?'Edit prompt':'New prompt'));
+ const panel=uiText('form',null,{className:'editor-form'});panel.addEventListener('submit',e=>{e.preventDefault();if(panel.reportValidity())saveDraft();});
+ const writing=uiText('section',null,{className:'panel editor-writing'}),organize=uiText('section',null,{className:'panel editor-organize'}),advanced=uiText('details',null,{className:'panel editor-advanced'});writing.append(uiText('h2','The prompt'),uiText('p','Give it a clear name, then write the instructions you want to reuse.'));organize.append(uiText('h2','Organization'));advanced.append(uiText('summary','Notes & model preferences'));
  const state=uiText('p',appState.dirty?'Unsaved changes':'Template draft',{id:'save-state',className:'save-state'});panel.append(state);
  const update=(key,value)=>{p[key]=value;appState.dirty=true;state.textContent='Unsaved changes';};
  for(const [key,label,max,multiline] of [['title','Title',160,false],['body','Prompt template',20000,true],['notes','Notes',4000,true],['negativePrompt','Negative prompt',4000,true],['model','Model label',100,false]]){
-  const f=field(label,p[key],{multiline,required:key==='title'||key==='body',onInput:v=>update(key,v)});f.input.maxLength=max;panel.append(f.wrap);
+  const f=field(label,p[key],{multiline,required:key==='title'||key==='body',onInput:v=>update(key,v)});f.input.maxLength=max;f.wrap.dataset.field=key;(key==='title'||key==='body'?writing:advanced).append(f.wrap);
  }
  const category=uiText('select',null,{className:'input',id:'edit-category'}),label=uiText('label','Category',{for:'edit-category',className:'field-label'});
- for(const c of appState.committed.categories.filter(c=>c.status==='active')){const option=uiText('option',c.name);option.value=c.id;category.append(option);}category.value=p.categoryId;category.addEventListener('change',()=>{update('categoryId',category.value);p.subcategory='';});panel.append(label,category);
+ for(const c of appState.committed.categories.filter(c=>c.status==='active')){const option=uiText('option',c.name);option.value=c.id;category.append(option);}category.value=p.categoryId;category.addEventListener('change',()=>{update('categoryId',category.value);p.subcategory='';});organize.append(label,category);
  const sub=uiText('select',null,{className:'input',id:'edit-subcategory'});
  function populateSubcategories(){sub.replaceChildren();const selected=appState.committed.categories.find(c=>c.id===p.categoryId);for(const name of ['',...(selected?.subcategories||[])]){const o=uiText('option',name||'None');o.value=name;sub.append(o);}sub.value=p.subcategory||'';}
  sub.addEventListener('change',()=>update('subcategory',sub.value));category.addEventListener('change',populateSubcategories);populateSubcategories();
- panel.append(action('Add category',()=>openCategoryDialog(null,created=>{p.categoryId=created.id;p.subcategory='';update('categoryId',created.id);renderEditorView(appState.baseRecord);}), 'ghost','add'),uiText('label','Subcategory',{for:'edit-subcategory',className:'field-label'}),sub);
- const tags=field('Tags · comma separated',(p.tags||[]).join(', '),{onInput:v=>update('tags',v.split(',').map(s=>s.trim()).filter(Boolean))});panel.append(tags.wrap);
- const variablePanel=uiText('section',null,{className:'variable-editor'});
+ organize.append(action('Add category',()=>openCategoryDialog(null,created=>{p.categoryId=created.id;p.subcategory='';update('categoryId',created.id);renderEditorView(appState.baseRecord);}), 'ghost','add'),uiText('label','Subcategory',{for:'edit-subcategory',className:'field-label'}),sub);
+ const tags=field('Tags · comma separated',(p.tags||[]).join(', '),{onInput:v=>update('tags',v.split(',').map(s=>s.trim()).filter(Boolean))});organize.append(tags.wrap);
+ const variablePanel=uiText('section',null,{className:'panel variable-editor'});
  function syncVariableFields(){
   const keys=[...new Set([...(p.body||'').matchAll(/{{([a-z][a-z0-9_]{0,31})}}/g)].map(m=>m[1]))],old=new Map((p.variables||[]).map(v=>[v.key,v]));
   p.variables=keys.map(key=>old.get(key)||{key,label:key.replaceAll('_',' '),type:'text',required:true,example:''});
@@ -113,9 +121,9 @@ function renderEditorView(record){
    variablePanel.append(row);
   }
  }
- syncVariableFields();panel.append(variablePanel);
- const bodyInput=panel.querySelector('textarea');bodyInput.addEventListener('input',syncVariableFields);
- const buttons=uiText('div',null,{className:'actions'}),save=action('Save prompt',()=>{if(panel.reportValidity())saveDraft();},'primary');save.id='save-prompt';buttons.append(save,action('Download draft',()=>downloadJson('prompt-draft.json',p)),action('Cancel',()=>navigate('library')));panel.append(buttons);$('view').replaceChildren(panel);
+ syncVariableFields();panel.append(writing,organize,variablePanel,advanced);
+ const bodyInput=writing.querySelector('textarea');bodyInput.addEventListener('input',syncVariableFields);
+ const buttons=uiText('div',null,{className:'actions editor-actions'}),save=action('Save prompt',()=>{if(panel.reportValidity())saveDraft();},'primary');save.id='save-prompt';buttons.append(save,action('Download draft',()=>downloadJson('prompt-draft.json',p)),action('Cancel',()=>navigate('library')));const toolbar=uiText('div',null,{className:'editor-toolbar'});toolbar.append(state,buttons);panel.prepend(toolbar);$('view').replaceChildren(panel);
 }
 async function saveDraft(){
  const p=appState.draft;if(!p)return;
@@ -144,7 +152,7 @@ function renderCategoriesView(){
  const content=uiText('div'),heading=uiText('div',null,{className:'category-heading'});heading.append(uiText('h2','Organize your library'),action('Add category',()=>openCategoryDialog(),'primary','add'));content.append(heading,uiText('p','Categories help you find a prompt. Subcategories keep related tasks together.',{className:'section-description'}));
  for(const c of appState.committed.categories.filter(c=>c.status==='active')){
   const row=uiText('section',null,{className:'category-row'}),title=uiText('div',null,{className:'category-row-title'}),dot=uiText('span',null,{className:'category-dot'});dot.style.background=/^#[0-9a-f]{6}$/i.test(c.color)?c.color:'#f5a623';
-  title.append(dot,uiText('h3',c.name),uiText('span',appState.committed.prompts.filter(p=>p.categoryId===c.id&&p.status!=='archived').length+' prompts',{className:'category-count'}));
+  title.append(dot,uiText('h3',c.name),uiText('span',appState.committed.prompts.filter(p=>p.categoryId===c.id&&p.status!=='archived').length+' prompt'+(appState.committed.prompts.filter(p=>p.categoryId===c.id&&p.status!=='archived').length===1?'':'s'),{className:'category-count'}));
   const details=uiText('p',c.subcategories.length?c.subcategories.join(' · '):'No subcategories yet',{className:'category-subtext'}),controls=uiText('div',null,{className:'actions'});
   controls.append(action('Browse',()=>selectCategory(c.id),'ghost','arrow-right'),action('Edit category',()=>openCategoryDialog(c),'secondary','edit-2'),action('Archive category',async()=>{const count=appState.committed.prompts.filter(p=>p.categoryId===c.id).length;if(await confirmAction('Archive '+c.name+' and its '+count+' prompts? They can be restored later.'))mutate('archiveCategoryV2',{id:c.id,expectedRevision:c.revision,promptPolicy:'archive'});},'ghost','archive'));row.append(title,details,controls);content.append(row);
  }
@@ -158,13 +166,13 @@ async function downloadArchive(method,name){
  try{let cursor=null,rows=[],first;do{const page=await vaultApi.call(method,{cursor,limit:25});if(await checksumJson(page.rows)!==page.pageChecksum)throw Error('Export page failed checksum verification.');first=first||page;if(page.vaultRevision!==first.vaultRevision||page.archiveChecksum!==first.archiveChecksum)throw Error('Vault changed during export.');rows.push(...page.rows);cursor=page.nextCursor;}while(cursor);if(await checksumJson(rows)!==first.archiveChecksum)throw Error('Export archive is incomplete.');downloadJson(name,{kind:first.kind,sourceInstall:first.sourceInstall,vaultRevision:first.vaultRevision,rows,checksum:first.archiveChecksum});announce('Verified archive downloaded.');}catch(e){announce(e.message,'error');}
 }
 function renderSettingsView(){
- const panel=uiText('section',null,{className:'panel'});panel.append(uiText('h2','Settings & backup'),uiText('p','Owner-only library · Schema '+(appState.committed.settings.schemaVersion||'—')),uiText('p','AI assistance and private image uploads are disabled. Backups contain attachment references, not image bytes.'));
- panel.append(action('Export current prompts & categories',async()=>{try{const bundle=await vaultApi.call('exportVaultV2'),check={...bundle};delete check.checksum;if(await checksumJson(check)!==bundle.checksum)throw Error('Export checksum does not match.');downloadJson('prompt-vault.json',bundle);announce('Current records exported. Download history and quarantine separately for complete recovery evidence.');}catch(e){announce(e.message,'error');}}),action('Export full history',()=>downloadArchive('exportHistoryV2','prompt-vault-history.json')),action('Export quarantine',()=>downloadArchive('exportQuarantineV2','prompt-vault-quarantine.json')));
+ const panel=uiText('div',null,{className:'settings-layout'}),exports=uiText('section',null,{className:'panel settings-exports'}),imports=uiText('section',null,{className:'panel settings-import'}),local=uiText('section',null,{className:'panel settings-local'});exports.append(uiText('h2','Export your vault'),uiText('p','Download your prompts and categories as a JSON backup. Export history separately to keep past versions.'));
+ exports.append(action('Export current prompts & categories',async()=>{try{const bundle=await vaultApi.call('exportVaultV2'),check={...bundle};delete check.checksum;if(await checksumJson(check)!==bundle.checksum)throw Error('Export checksum does not match.');downloadJson('prompt-vault.json',bundle);announce('Current records exported. Download history and quarantine separately for complete recovery evidence.');}catch(e){announce(e.message,'error');}}),action('Export full history',()=>downloadArchive('exportHistoryV2','prompt-vault-history.json')),action('Export quarantine',()=>downloadArchive('exportQuarantineV2','prompt-vault-quarantine.json')));
  const pending=appState.committed.pendingOperation;
  if(pending){const box=uiText('section',null,{className:'panel'});box.append(uiText('h3','Unfinished '+pending.kind),uiText('p',pending.staged+' of '+pending.total+' records staged. Prior saved records are still visible.'));
   if(pending.kind==='import')box.append(action('Resume import',()=>mutate('advanceImportV2',{operationId:pending.operationId})),action('Cancel import',async()=>{if(await confirmAction('Cancel the uncommitted import? Existing saved records stay unchanged.'))mutate('cancelImportV2',{operationId:pending.operationId});}));panel.append(box);
  }
- const upload=field('Import a current-record JSON backup','',{type:'file'});upload.input.accept='.json,application/json';panel.append(uiText('h3','Preview an import'),uiText('p','Review the source and changes first. History archives require the separate clone restore guide.'),upload.wrap);
+ const upload=field('Import a current-record JSON backup','',{type:'file'});upload.input.accept='.json,application/json';imports.append(uiText('h2','Import a backup'),uiText('p','Choose a JSON backup to preview its contents before you import. Review the proposed changes before adding them to your vault.'),upload.wrap);
  upload.input.addEventListener('change',async()=>{try{
   const file=upload.input.files[0];if(!file)return;if(file.size>5*1024*1024)throw Error('Choose a backup smaller than 5 MiB.');const preview=await vaultApi.call('previewImportV2',JSON.parse(await file.text())),content=uiText('div');
   content.append(uiText('p',preview.items.length+' valid records; '+preview.issues.length+' issues. Nothing has been imported.'));
@@ -174,11 +182,12 @@ function renderSettingsView(){
   const intent={operationId:crypto.randomUUID(),planId:preview.planId};
   const start=action('Start reviewed import',async()=>{start.disabled=true;try{await vaultApi.call('beginImportV2',{...intent,selections:{adoptAsCopy:adopt.checked,updateMatching:update.checked}});document.querySelector('dialog')?.close();await loadVault();}catch(e){announce(e.message,'error');start.disabled=false;}});start.disabled=preview.issues.length>0;content.append(start);openDialog({title:'Review import',content});
  }catch(e){announce(e.message,'error');}});
- panel.append(action('Clear local preferences',()=>{try{localStorage.removeItem(preferenceKey());}catch(_){}announce('Local preferences cleared.');}),uiText('p','Live Google deployment tests, legacy clone migration and full-history clone restoration remain required release checks.'));
- $('view').replaceChildren(panel);
+ local.append(uiText('h2','Local preferences'),uiText('p','Reset the theme and display preferences for this browser.'),action('Clear local preferences',()=>{try{localStorage.removeItem(preferenceKey());}catch(_){}announce('Local preferences cleared.');}),uiText('p','Clearing preferences leaves your saved prompts and categories unchanged.'));
+ panel.append(exports,imports,local);$('view').replaceChildren(panel);
 }
 $('theme-btn').addEventListener('click',()=>setTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
-function setSidebarOpen(open){
+function setSidebarOpen(open,animate=true){
+ $('sidebar').dataset.animate=String(animate);
  const mobile=matchMedia('(max-width:767px)').matches;
  $('sidebar').classList.toggle('open',mobile&&open);$('sidebar').inert=mobile&&!open;$('mobile-menu-btn').setAttribute('aria-expanded',String(mobile&&open));
  if(mobile&&open)$('sidebar-close').focus();
@@ -186,11 +195,11 @@ function setSidebarOpen(open){
 $('mobile-menu-btn').addEventListener('click',()=>setSidebarOpen(!$('sidebar').classList.contains('open')));
 $('sidebar-close').addEventListener('click',()=>{setSidebarOpen(false);$('mobile-menu-btn').focus();});
 $('nav-scrim').addEventListener('click',()=>setSidebarOpen(false));
-matchMedia('(max-width:767px)').addEventListener('change',()=>setSidebarOpen(false));
-setSidebarOpen(false);
+matchMedia('(max-width:767px)').addEventListener('change',()=>setSidebarOpen(false,false));
+setSidebarOpen(false,false);
 $('new-prompt').addEventListener('click',()=>navigate('editor'));
 let searchTimer;$('search-input').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{if(['library','archive'].includes(appState.page))renderCurrent();else navigate('library');},150);});
-document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();$('search-input').focus();}if(e.key==='Escape'){setSidebarOpen(false);}});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&!$('search-row').hidden&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();$('search-input').focus();}if(e.key==='Escape'){setSidebarOpen(false);}});
 window.addEventListener('beforeunload',e=>{if(appState.dirty){e.preventDefault();e.returnValue='';}});
 $('sidebar-close').append(iconsax('close-square'));$('brand-symbol').append(iconsax('book'));$('search-symbol').append(iconsax('search-normal'));$('theme-btn').append(iconsax('moon'));$('mobile-menu-btn').append(iconsax('menu'));$('new-prompt').prepend(iconsax('add'));
 const demoNotice=document.querySelector('.demo-notice');if(demoNotice){demoNotice.textContent='Demo · sample data · local changes only';demoNotice.title='Changes stay in local server memory. No Google or AI calls.';}
