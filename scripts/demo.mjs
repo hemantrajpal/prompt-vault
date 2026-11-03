@@ -6,6 +6,12 @@ import {publicNames} from '../tests/owner-edition/helpers/load-gas.mjs';
 const {g}=initialized(),cat=category(g,'Website delivery');
 const pack=JSON.parse(readFileSync('content/packs/website.json','utf8'));
 for(const [i,w] of pack.workflows.entries())success(g.savePromptV2({operationId:'demo-'+i,expectedRevision:0,record:{...w,categoryId:cat.id}}));
+for(const [i,item]of [
+ {category:'Brand & discovery',title:'Find a consistent brand voice',key:'writing_samples',body:'Describe a consistent brand voice using only these approved writing samples: {{writing_samples}}. Return tone principles and examples; flag missing context.'},
+ {category:'Shopify content',title:'Draft a product description',key:'product_facts',body:'Write a product description using only these verified facts: {{product_facts}}. Do not invent materials, stock or delivery promises.'}
+].entries()){
+ const c=category(g,item.category);success(g.savePromptV2({operationId:'demo-other-'+i,expectedRevision:0,record:{title:item.title,body:item.body,categoryId:c.id,variables:[{key:item.key,label:item.key.replaceAll('_',' '),type:'multiline',required:true,example:'Use approved facts only.'}],tags:['sample'],notes:'Synthetic demo candidate; not approved for client use.'}}));
+}
 const allowed=new Set(publicNames());
 const port=Number(process.env.PORT||4322);
 http.createServer(async(req,res)=>{

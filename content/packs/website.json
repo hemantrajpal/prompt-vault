@@ -54,7 +54,8 @@
         ],
         "reviewStatus": "draft",
         "contentOwner": "Studio owner",
-        "lastTested": null
+        "lastTested": null,
+        "summary": "Turn an approved brief into a clear page-by-page content plan."
       }
     },
     {
@@ -108,7 +109,8 @@
         ],
         "reviewStatus": "draft",
         "contentOwner": "Studio owner",
-        "lastTested": null
+        "lastTested": null,
+        "summary": "Write a service page using verified offer facts and your brand voice."
       }
     },
     {
@@ -162,7 +164,8 @@
         ],
         "reviewStatus": "draft",
         "contentOwner": "Studio owner",
-        "lastTested": null
+        "lastTested": null,
+        "summary": "Find clarity, hierarchy, and usability issues in supplied page copy."
       }
     },
     {
@@ -216,7 +219,8 @@
         ],
         "reviewStatus": "draft",
         "contentOwner": "Studio owner",
-        "lastTested": null
+        "lastTested": null,
+        "summary": "Build a scoped handover checklist for UAT and launch."
       }
     }
   ]

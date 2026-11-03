@@ -1,4 +1,7 @@
 <script>
+document.documentElement.dataset.modality='keyboard';
+document.addEventListener('pointerdown',()=>{document.documentElement.dataset.modality='pointer';},true);
+document.addEventListener('keydown',()=>{document.documentElement.dataset.modality='keyboard';},true);
 function uiText(tag,text,attributes={}) {
   const node=document.createElement(tag);if(text!==null&&text!==undefined)node.textContent=String(text);
   for(const [key,value] of Object.entries(attributes)){
@@ -26,9 +29,9 @@ function announce(message,kind='status') {
 function openDialog({title,content,actions=[],returnFocus=document.activeElement}) {
   const dialog=uiText('dialog',null,{className:'vault-dialog'}),heading=uiText('h2',title,{id:'dialog-'+crypto.randomUUID()});
   dialog.setAttribute('aria-labelledby',heading.id);dialog.append(heading,content);
-  const close=()=>{dialog.close();dialog.remove();if(returnFocus?.isConnected)returnFocus.focus();};
+  let closing=false;const close=()=>{if(closing)return;closing=true;const finish=()=>{dialog.close();dialog.remove();if(returnFocus?.isConnected)returnFocus.focus();};if(document.documentElement.dataset.modality!=='keyboard'&&!matchMedia('(prefers-reduced-motion:reduce)').matches){const current=getComputedStyle(dialog),start={opacity:current.opacity,transform:current.transform};dialog.getAnimations().forEach(a=>a.cancel());dialog.animate([start,{opacity:0,transform:'translateY(4px) scale(.99)'}],{duration:120,easing:'cubic-bezier(.23,1,.32,1)'}).finished.then(finish,finish);}else finish();};
   const footer=uiText('div',null,{className:'actions'});for(const a of actions)footer.append(action(a.label,()=>{close();a.run?.();},a.kind||'secondary'));
-  footer.append(action('Close',close));dialog.append(footer);dialog.addEventListener('cancel',e=>{e.preventDefault();close();});dialog.addEventListener('close',()=>{dialog.remove();if(returnFocus?.isConnected)returnFocus.focus();});document.body.append(dialog);dialog.showModal();return dialog;
+  footer.append(action('Close',close));dialog.append(footer);dialog.addEventListener('cancel',e=>{e.preventDefault();close();});dialog.addEventListener('close',()=>{dialog.remove();if(returnFocus?.isConnected)returnFocus.focus();});document.body.append(dialog);dialog.showModal();if(document.documentElement.dataset.modality!=='keyboard'&&!matchMedia('(prefers-reduced-motion:reduce)').matches)dialog.animate([{opacity:0,transform:'translateY(6px) scale(.98)'},{opacity:1,transform:'translateY(0) scale(1)'}],{duration:180,easing:'cubic-bezier(.23,1,.32,1)'});return dialog;
 }
 async function confirmAction(message){return new Promise(resolve=>{
  let answered=false;const content=uiText('p',message);const d=openDialog({title:'Confirm change',content,actions:[{label:'Confirm',kind:'primary',run:()=>{answered=true;resolve(true);}}]});d.addEventListener('close',()=>{if(!answered)resolve(false);});
