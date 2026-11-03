@@ -35,6 +35,8 @@ AI assistance and image uploads are disabled. JSON exports contain attachment re
 
 ## Installation and remaining gates
 
+The [UI and interaction audit](docs/owner-edition/2026-11-04-UI-AUDIT.md) records the rendered component measurements and four open P1 findings. Passing the local suite does not close these release issues.
+
 Read [INSTALL.md](docs/owner-edition/INSTALL.md), [LIVE-ACCEPTANCE.md](docs/owner-edition/LIVE-ACCEPTANCE.md) and [execution status](docs/owner-edition/EXECUTION.md). Work on a disposable installation first; setup creates v2 tables without clearing legacy data. No production migration/cutover is implied.
 
 The [implementation roadmap](docs/superpowers/plans/2026-11-04-prompt-vault-roadmap.md) remains the full scope. Historical preview/screenshots/media illustrate the earlier interface and do not prove authorization/persistence. Media build dependencies and asset provenance require separate release review.
