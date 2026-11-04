@@ -41,7 +41,7 @@ function beginImportV2(args){return rpc_(function(actor){return withVaultLock_(f
    const old=!foreign?(type==='category'?h.categories:h.prompts).find(function(x){return x.id===r.id;}):null;
    if(old){if(canonicalJson_(old)===canonicalJson_(r))return old;assertValid_(args.selections&&args.selections.updateMatching===true,'selections','Explicitly select matching-record updates.');if(old.revision!==r.revision)throw vaultError_('CONFLICT','Imported version differs from saved revision.');}
    const metadata=metadata_(actor,old),value=Object.assign({},r,metadata);
-   if(!foreign&&!old){value.id=r.id;value.createdAt=r.createdAt;value.createdBy=actor.email;value.provenance=r.provenance||null;}
+   if(!foreign&&!old){value.id=r.id;value.createdAt=r.createdAt;value.modifiedAt=r.modifiedAt;value.createdBy=actor.email;value.provenance=r.provenance||null;}
    else if(foreign){value.provenance={sourceInstallId:bundle.sourceInstallId,sourceEntityId:r.id,sourceOwnerEmail:r.ownerEmail||'',sourceCreatedAt:r.createdAt||'',sourceModifiedAt:r.modifiedAt||'',importedAt:now,bundleDigest:bundle.checksum,legacyLocation:null};}
    if(type==='prompt')value.categoryId=idMap[r.categoryId];
    const valid=type==='prompt'?validatePrompt_(value):validateCategory_(value);entries.push({type:type,operationId:args.operationId,record:valid});return valid;
@@ -79,6 +79,38 @@ function writeQuarantine_(ownerEmail,source,location,reason,raw){
 function exportLegacy_(){
  requireOwner_();const ss=SpreadsheetApp.openById(sheetId_());const snapshot={exportedAt:new Date().toISOString(),tabs:ss.getSheets().filter(function(s){return VAULT_TABLES_.indexOf(s.getName())<0;}).map(function(s){const range=s.getDataRange();return {name:s.getName(),rows:range.getValues().map(function(row){return row.map(function(v){return v instanceof Date?v.toISOString():v;});}),formulas:range.getFormulas()};})};snapshot.checksum=digest_(snapshot);return snapshot;
 }
+/** Normalize old free-form variable names without changing their labels or literal text. */
+function normalizeLegacyTemplate_(body,definitions){
+ const used=Object.create(null),mapping=Object.create(null);
+ const variables=definitions.map(function(v){
+  const name=String(v.key||v.n||v.name||'');assertValid_(!!name&&!Object.prototype.hasOwnProperty.call(mapping,name),'variables','Legacy variable names must be present and unique.');
+  let base=name.toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'');if(!/^[a-z]/.test(base))base='input_'+base;base=base.slice(0,28)||'input';
+  let key=base,index=2;while(used[key])key=base+'_'+index++;used[key]=true;mapping[name]=key;
+  const result={key:key,label:v.label||v.l||name,type:v.type||'text',required:v.required===undefined?true:v.required,example:v.example||v.p||v.placeholder||''};if(v.defaultValue!==undefined)result.defaultValue=v.defaultValue;return result;
+ });
+ const normalized=body.replace(/{{([\s\S]*?)}}/g,function(token,name){return Object.prototype.hasOwnProperty.call(mapping,name)?'{{'+mapping[name]+'}}':token;});
+ return {body:normalized,variables:variables,changed:normalized!==body,mapping:mapping};
+}
+/** Editor-only migration preparation. No writes; legacy creators still must match the owner. */
+function prepareLegacyImport_(snapshot,imageFiles){
+ const actor=requireOwner_(),config=settings_(),preview=previewLegacyMigration_(snapshot);
+ assertValid_(!preview.quarantine.length,'legacy','Resolve every legacy row before importing.');
+ const sourceDigest=digest_({tabs:snapshot.tabs}),categoryIds={},seen=Object.create(null),files=Object.create(null);
+ (imageFiles||[]).forEach(function(f){assertValid_(f&&/^[\w-]{10,100}$/.test(f.id)&&!files[f.id]&&['image/png','image/jpeg','image/webp'].indexOf(f.mimeType)>=0,'images','Invalid or duplicate image reference.');files[f.id]=f;});
+ function asset(f){return {assetId:f.id,sourceInstallId:'legacy-'+sourceDigest,checksum:String(f.md5Checksum||''),byteSize:Number(f.size),mimeType:f.mimeType};}
+ preview.bundle.categories.forEach(function(c){const id=digest_({sheet:sheetId_(),category:c.name}).slice(0,32);categoryIds[c.id]=id;c.id=id;});
+ preview.bundle.prompts.forEach(function(p){p.id=digest_({sheet:sheetId_(),prompt:p.id}).slice(0,32);p.categoryId=categoryIds[p.categoryId];p.provenance.sourceInstallId='legacy-'+sourceDigest;p.provenance.bundleDigest=sourceDigest;
+  const match=p.legacyImageUrl.match(/^https:\/\/drive\.google\.com\/thumbnail\?id=([\w-]+)(?:&|$)/),file=match&&files[match[1]];
+  if(match)assertValid_(!!file,'images','A linked Drive image is missing from the inventory.');
+  if(file){p.attachments=[asset(file)];seen[file.id]=true;}
+ });
+ const unassigned=Object.keys(files).filter(function(id){return !seen[id];}).map(function(id){const f=files[id];return Object.assign(asset(f),{name:f.name,url:'https://drive.google.com/thumbnail?id='+id+'&sz=w1200'});});
+ if(unassigned.length){const category=preview.bundle.categories.find(function(c){return c.name==='Image Generation';});assertValid_(!!category,'images','Choose a category for unmatched images.');category.referenceImages=unassigned;validateCategory_(category);}
+ // This is the same owner's existing spreadsheet, with original identities kept in provenance.
+ preview.bundle.sourceInstallId=config.installId;preview.bundle.prompts.forEach(function(p){validateImportRecord_(p,preview.bundle,config);});
+ preview.bundle.checksum=bundleChecksum_(preview.bundle);
+ return {bundle:preview.bundle,sourceChecksum:sourceDigest,operationId:'legacy-'+sourceDigest.slice(0,40),summary:{prompts:preview.bundle.prompts.length,categories:preview.bundle.categories.length,linkedDriveImages:Object.keys(seen).length,unassignedImages:unassigned.length,externalImages:preview.bundle.prompts.filter(function(p){return p.legacyImageUrl&&!p.attachments.length;}).length,normalizedTemplates:preview.bundle.prompts.filter(function(p){return p.provenance.originalTemplate;}).length}};
+}
 function previewLegacyMigration_(snapshot){
  const actor=requireOwner_();assertValid_(snapshot&&Array.isArray(snapshot.tabs),'snapshot','A raw legacy snapshot is required.');
  const source='legacy-'+digest_(snapshot),config=snapshot.tabs.find(function(t){return t.name==='Config';}),categories=[],prompts=[],quarantine=[],categoryMap={},candidates=[];
@@ -96,9 +128,13 @@ function previewLegacyMigration_(snapshot){
   assertValid_(!c.tab.formulas||!(c.tab.formulas[c.index-1]||[]).some(Boolean),'formula','Active formula requires review.');
   assertValid_(Number.isFinite(Date.parse(r.CreatedAt))&&Number.isFinite(Date.parse(r.ModifiedAt)),'dates','Creation/modification dates require review.');
   let category=categoryMap[c.tab.name];if(c.tab.name==='_Archive'){const name=String(r.OriginalCategory||'Legacy archive');category=categoryMap[name];if(!category){category=validateCategory_(Object.assign(metadata_(actor,null),{name:name,color:'#64748b',subcategories:[],status:'archived'}));categoryMap[name]=category;categories.push(category);}}
-  const variables=(typeof r.Variables==='string'?JSON.parse(r.Variables||'[]'):r.Variables||[]).map(function(v){return {key:v.key||v.n||v.name,label:v.label||v.l||v.key||v.n||v.name,type:v.type||'text',required:v.required===undefined?true:v.required,example:v.example||v.p||v.placeholder||''};});
-  const p=validatePrompt_(Object.assign(metadata_(actor,null),{id:String(r.PromptID),categoryId:category.id,subcategory:String(r.Subcategory||''),title:String(r.Title||''),body:String(r.Prompt||''),tags:String(r.Tags||'').split(',').map(function(t){return t.trim();}).filter(Boolean),variables:variables,model:String(r.Model||''),legacyImageUrl:String(r.ImageURL||''),notes:typeof r.ImprovementNotes==='string'?r.ImprovementNotes:JSON.stringify(r.ImprovementNotes||''),negativePrompt:String(r.NegativePrompt||''),status:c.tab.name==='_Archive'?'archived':'active',createdBy:actor.email,createdAt:new Date(r.CreatedAt).toISOString(),modifiedAt:new Date(r.ModifiedAt).toISOString(),provenance:{sourceInstallId:source,sourceEntityId:String(r.PromptID),sourceOwnerEmail:r.CreatedBy,sourceCreatedAt:r.CreatedAt,sourceModifiedAt:r.ModifiedAt,importedAt:null,bundleDigest:digest_(snapshot),legacyLocation:c.location}}));
+  const template=normalizeLegacyTemplate_(String(r.Prompt||''),typeof r.Variables==='string'?JSON.parse(r.Variables||'[]'):r.Variables||[]);
+  let tags=String(r.Tags||'').split(',').map(function(t){return t.trim();}).filter(Boolean),notes=typeof r.ImprovementNotes==='string'?r.ImprovementNotes:JSON.stringify(r.ImprovementNotes||'');
+  const provenance={sourceInstallId:source,sourceEntityId:String(r.PromptID),sourceOwnerEmail:r.CreatedBy,sourceCreatedAt:r.CreatedAt,sourceModifiedAt:r.ModifiedAt,importedAt:null,bundleDigest:digest_(snapshot),legacyLocation:c.location};
+  if(template.changed){provenance.originalTemplate=String(r.Prompt);provenance.variableMapping=template.mapping;}
+  if(tags.length>20||tags.some(function(t){return t.length>40;})){notes+=(notes?'\n\n':'')+'Original tag field:\n'+String(r.Tags);tags=[];provenance.originalTags=String(r.Tags);}
+  const p=validatePrompt_(Object.assign(metadata_(actor,null),{id:String(r.PromptID),categoryId:category.id,subcategory:String(r.Subcategory||''),title:String(r.Title||''),body:template.body,tags:tags,variables:template.variables,model:String(r.Model||''),legacyImageUrl:String(r.ImageURL||''),notes:notes,negativePrompt:String(r.NegativePrompt||''),status:c.tab.name==='_Archive'?'archived':'active',createdBy:actor.email,createdAt:new Date(r.CreatedAt).toISOString(),modifiedAt:new Date(r.ModifiedAt).toISOString(),provenance:provenance}));
   if(p.subcategory&&category.subcategories.indexOf(p.subcategory)<0)throw vaultError_('VALIDATION','Unmapped subcategory.');prompts.push(p);
- }catch(e){reject(c.location,e.message,c.raw);}});
+ }catch(e){reject(c.location,e.fieldErrors?JSON.stringify(e.fieldErrors):e.message,c.raw);}});
  const bundle={schemaVersion:2,sourceInstallId:source,sourceVaultRevision:0,exportedAt:new Date().toISOString(),categories:categories,prompts:prompts,quarantineManifest:[]};bundle.checksum=bundleChecksum_(bundle);return {bundle:bundle,quarantine:quarantine,sourceChecksum:digest_(snapshot)};
 }

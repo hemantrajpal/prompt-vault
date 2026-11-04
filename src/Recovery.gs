@@ -11,7 +11,9 @@ function preflightEntries_(entries) {
 function writePayload_(op,key,value) {
   const text=canonicalJson_(value),parts=[];for(let i=0;i<text.length;i+=5000)parts.push(text.slice(i,i+5000));
   const ref={op:op,key:key,count:parts.length,digest:digest_(text)};
-  parts.forEach(function(part,i){const id=op+':'+key+':'+i,old=readRecord_('_OperationPayloads',id);const row={part:part,index:i,count:parts.length};if(old&&canonicalJson_(old)!==canonicalJson_(row))throw vaultError_('RECOVERY_REQUIRED','Operation payload differs.');if(!old)putRecord_('_OperationPayloads',id,row);});return ref;
+  const missing=[];
+  parts.forEach(function(part,i){const id=op+':'+key+':'+i,old=readRecord_('_OperationPayloads',id);const row={part:part,index:i,count:parts.length};if(old&&canonicalJson_(old)!==canonicalJson_(row))throw vaultError_('RECOVERY_REQUIRED','Operation payload differs.');if(!old)missing.push([id,canonicalJson_(row)]);});
+  if(missing.length)writeRawRows_('_OperationPayloads',readRawRows_('_OperationPayloads').length+1,missing);return ref;
 }
 function readPayload_(ref) {
   if(!ref||!Number.isInteger(ref.count)||ref.count<1)throw vaultError_('RECOVERY_REQUIRED','Missing operation payload.');

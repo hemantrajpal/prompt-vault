@@ -1,4 +1,7 @@
 <script>
+function imageReferenceUrl(value){
+ try{const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password)return null;return url.href;}catch(_){return null;}
+}
 function assemblePrompt(template,variables,values) {
   const definitions=new Map((variables||[]).map(v=>[v.key,v])),missingKeys=[],invalidKeys=[];
   const text=String(template||'').replace(/{{([\s\S]*?)}}/g,(token,key)=>{

@@ -49,5 +49,6 @@ function validateCategory_(input) {
   assertValid_(Array.isArray(r.subcategories||[]) && (r.subcategories||[]).length<=100,'subcategories','Use at most 100 subcategories.');
   r.subcategories=(r.subcategories||[]).map(function(s){return textField_(s,80,'subcategories',true).trim();});
   assertValid_(new Set(r.subcategories.map(function(s){return s.toLowerCase();})).size===r.subcategories.length,'subcategories','Subcategory names must be unique.');
-  r.status=r.status||'active';assertValid_(['active','archived'].indexOf(r.status)>=0,'status','Invalid status.');return r;
+  if(r.referenceImages!==undefined){assertValid_(Array.isArray(r.referenceImages)&&r.referenceImages.length<=100,'referenceImages','Use at most 100 category images.');r.referenceImages=r.referenceImages.map(function(a){assertValid_(a&&typeof a.assetId==='string'&&/^[\w-]{10,100}$/.test(a.assetId)&&a.url==='https://drive.google.com/thumbnail?id='+a.assetId+'&sz=w1200','referenceImages','Use a valid Drive image reference.');textField_(a.name,200,'referenceImages',true);assertValid_(['image/png','image/jpeg','image/webp'].indexOf(a.mimeType)>=0&&Number.isInteger(a.byteSize)&&a.byteSize>=0,'referenceImages','Invalid image metadata.');return Object.assign({},a);});}
+  r.status=r.status||'active';assertValid_(['active','archived'].indexOf(r.status)>=0,'status','Invalid status.');assertValid_(canonicalJson_(r).length<=40000,'record','This category is too large.');return r;
 }

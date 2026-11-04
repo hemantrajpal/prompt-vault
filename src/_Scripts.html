@@ -1,6 +1,18 @@
 <script>
 const appState={committed:{prompts:[],categories:[],settings:{}},draft:null,baseRecord:null,saveIntent:null,dirty:false,useInputs:{},page:'library',categoryId:null,requestState:'loading',layout:'grid',subcategory:null};
 const $=id=>document.getElementById(id);
+function referenceImage(url,label,compact=false){
+ const safe=imageReferenceUrl(url);if(!safe)return null;
+ const figure=uiText('figure',null,{className:'reference-image'+(compact?' reference-image-compact':'')}),image=uiText('img',null);
+ image.alt=label;image.loading='lazy';image.decoding='async';image.referrerPolicy='no-referrer';
+ const caption=uiText('figcaption',null),link=uiText('a','Open original image');link.href=safe;link.target='_blank';link.rel='noopener noreferrer';caption.append(link);
+ image.addEventListener('error',()=>{image.hidden=true;figure.classList.add('image-unavailable');caption.prepend(uiText('span','Preview unavailable. '));},{once:true});image.src=safe;figure.append(image,caption);return figure;
+}
+function renderCategoryImages(category){
+ if(!category?.referenceImages?.length)return null;
+ const section=uiText('section',null,{className:'panel unmatched-images'});section.append(uiText('h2','Images without a matching prompt'),uiText('p','These files were in your original image folder. They are preserved here without assigning them to an unrelated prompt.'));
+ const gallery=uiText('div',null,{className:'reference-gallery'});for(const asset of category.referenceImages){const figure=referenceImage(asset.url,asset.name);if(figure){figure.querySelector('figcaption').prepend(uiText('span',asset.name+' '));gallery.append(figure);}}section.append(gallery);return section;
+}
 function preferenceKey(){const s=appState.committed.settings;return 'prompt-vault:'+s.installId+':'+s.ownerEmail;}
 function preferences(){try{return JSON.parse(localStorage.getItem(preferenceKey())||'{}');}catch(_){return {};}}
 function setPreference(key,value){try{localStorage.setItem(preferenceKey(),JSON.stringify({...preferences(),[key]:value}));}catch(_){} }
@@ -59,7 +71,7 @@ function renderLibraryView({records,query='',filters={},status='ready'}){
  for(const c of options){const b=action(c.name,()=>selectCategory(c.id,appState.page==='archive'?'archive':'library'),'ghost',false);b.classList.add('filter-chip');b.setAttribute('aria-pressed',String((filters.categoryId||null)===c.id));const count=uiText('span',records.filter(p=>(appState.page==='archive'?p.status==='archived':p.status!=='archived')&&(!c.id||p.categoryId===c.id)).length,{className:'filter-count'});count.setAttribute('aria-hidden','true');b.append(count);chips.append(b);}
  filterBar.append(chips);const selected=categories.find(c=>c.id===filters.categoryId);
  if(selected?.subcategories.length){const sub=uiText('select',null,{className:'input','aria-label':'Subcategory filter'});for(const name of ['',...selected.subcategories]){const o=uiText('option',name||'All subcategories');o.value=name;sub.append(o);}sub.value=appState.subcategory||'';sub.addEventListener('change',()=>{appState.subcategory=sub.value||null;renderCurrent();});filterBar.append(sub);}
- view.prepend(filterBar);
+ view.prepend(filterBar);if(appState.page!=='archive'){const gallery=renderCategoryImages(selected);if(gallery)view.append(gallery);}
  $('result-count').textContent=list.length+' prompt'+(list.length===1?'':'s');
  if(filters.categoryId||query){const clear=action('Clear filters',()=>{appState.categoryId=null;appState.subcategory=null;$('search-input').value='';renderNav();renderCurrent();});clear.classList.add('clear-filters');filterBar.append(clear);}
  if(!list.length){const empty=uiText('section',null,{className:'panel'});empty.append(uiText('h2',records.length?'No matching prompts':'Your vault starts here'),uiText('p',records.length?'Try another search or clear the filters.':'Create a prompt or import a reviewed workflow bundle.'),action('Create prompt',()=>navigate('editor'),'primary'));grid.append(empty);return;}
@@ -73,7 +85,7 @@ function renderLibraryView({records,query='',filters={},status='ready'}){
   const summary=p.workflow?.summary||(p.body||'').replace(/{{([a-z0-9_]+)}}/g,(_,key)=>key.replaceAll('_',' ')).replace(/\s+/g,' ').trim(),snippet=uiText('div',null,{className:'card-snippet'});snippet.append(uiText('p',summary,{className:'card-preview'}));
   const footer=uiText('div',null,{className:'card-footer'}),facts=uiText('div',null,{className:'prompt-facts'});facts.append(iconsax('document-text'),uiText('span',(p.variables||[]).length+' input'+((p.variables||[]).length===1?'':'s')));if(p.workflow)facts.append(uiText('span',p.workflow.reviewStatus==='approved'?'Reviewed':'Draft',{className:'workflow-status'}));
   const actions=uiText('div',null,{className:'actions'});actions.append(action(p.status==='archived'?'Restore':'Use',()=>p.status==='archived'?restorePrompt(p):navigate('use',p),'primary'));const listEdit=action('Edit',()=>navigate('editor',p),'ghost','edit-2');listEdit.classList.add('icon-button','card-list-edit');listEdit.title='Edit '+p.title;actions.append(listEdit);footer.append(facts,actions);
-  body.append(top,heading,snippet,footer);card.append(body);card.addEventListener('click',event=>{if(!event.target.closest('button,a,input,select')&&!window.getSelection()?.toString())navigate('use',p);});fragment.append(card);
+  body.append(top,heading,snippet,footer);const image=referenceImage(p.legacyImageUrl,'Reference image for '+p.title,true);if(image)card.append(image);card.append(body);card.addEventListener('click',event=>{if(!event.target.closest('button,a,input,select')&&!window.getSelection()?.toString())navigate('use',p);});fragment.append(card);
  }grid.append(fragment);
 }
 function renderUseView(p){
@@ -87,6 +99,8 @@ function renderUseView(p){
  const update=()=>{const r=assemblePrompt(p.body,p.variables,appState.useInputs);preview.textContent=r.text;copy.disabled=!!(r.missingKeys.length||r.invalidKeys.length);validation.textContent=r.invalidKeys.length?'Fix template variables before use.':r.missingKeys.length?'Complete: '+r.missingKeys.join(', '):'Ready to copy. Check the preview first.';};
  inputs.append(uiText('span','1 · PERSONALIZE',{className:'section-kicker'}),uiText('h3','Your inputs'),uiText('p','Add the details for this task. The preview updates as you type.'));if(!(p.variables||[]).length)inputs.append(uiText('p','This prompt is ready to use without any inputs.'));for(const v of p.variables||[]){const f=field(v.label,appState.useInputs[v.key],{multiline:v.type==='multiline',required:v.required,onInput:value=>{appState.useInputs[v.key]=value;update();}});f.input.placeholder=v.example||'';if(v.type==='multiline')f.input.rows=3;inputs.append(f.wrap);}
  inputs.append(validation);main.append(uiText('span','2 · REVIEW & COPY',{className:'section-kicker'}),uiText('h3','Prompt preview'),preview,copy);
+ const image=referenceImage(p.legacyImageUrl,'Reference image for '+p.title);if(image)main.append(uiText('h3','Reference image'),image);
+ for(const [label,value] of [['Negative prompt',p.negativePrompt],['Notes',p.notes],['Model',p.model]])if(value){const detail=uiText('details',null,{className:'imported-detail'});detail.append(uiText('summary',label),uiText('pre',value,{className:'prompt-body'}));main.append(detail);}
  if(p.workflow){for(const [label,value] of [['Review checklist',p.workflow.reviewChecklist],['Known limits',p.workflow.limits]]){main.append(uiText('h3',label));for(const line of Array.isArray(value)?value:[value||'Not specified'])main.append(uiText('p',line));}}
  const controls=uiText('div',null,{className:'actions'});controls.append(action('Edit template',()=>navigate('editor',p)),action('Version history',()=>showHistory(p)),action('Archive',()=>archivePrompt(p)));main.append(controls);layout.append(inputs,main);$('view').replaceChildren(layout);update();
 }
